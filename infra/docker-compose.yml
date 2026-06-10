@@ -74,7 +74,7 @@ services:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health | grep -q '\"redis\": \"ok\"' && curl -fsS http://localhost:8000/health | grep -q '\"postgres\": \"ok\"'"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health | grep -q '\"redis\":\"ok\"' && curl -fsS http://localhost:8000/health | grep -q '\"postgres\":\"ok\"'"]
       interval: 5s
       timeout: 5s
       retries: 20
