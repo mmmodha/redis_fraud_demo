@@ -1,0 +1,50 @@
+# Redis Data Integration pipeline configuration.
+#
+# Shape matches the published RDI `config.yaml` reference
+# (https://redis.io/docs/latest/integrate/redis-data-integration/reference/config-yaml-reference/)
+# so the same file can be lifted into the managed RDI Helm chart for
+# production. The single-container demo processor in `infra/rdi/processor.py`
+# reads this file as its source of truth.
+#
+# Environment variables in `${...}` are expanded at load time.
+
+sources:
+  source:
+    type: cdc
+    logging:
+      level: info
+    connection:
+      type: postgresql
+      host: ${POSTGRES_HOST}
+      port: ${POSTGRES_PORT}
+      database: ${POSTGRES_DB}
+      user: ${POSTGRES_USER}
+      password: ${POSTGRES_PASSWORD}
+    tables:
+      customers:
+        schema: public
+        primary_key: customer_id
+      accounts:
+        schema: public
+        primary_key: account_id
+      cards:
+        schema: public
+        primary_key: card_id
+      devices:
+        schema: public
+        primary_key: device_id
+      merchants:
+        schema: public
+        primary_key: merchant_id
+      merchant_categories:
+        schema: public
+        primary_key: code
+      transactions:
+        schema: public
+        primary_key: transaction_id
+
+targets:
+  target:
+    connection:
+      type: redis
+      url: ${REDIS_URL}

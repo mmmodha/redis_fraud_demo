@@ -1,0 +1,28 @@
+name: transactions
+source:
+  schema: public
+  table: transactions
+output:
+  # 1. JSON point document for the transaction.
+  - uses: redis.write
+    with:
+      connection: target
+      data_type: json
+      key: "tx:{transaction_id}"
+      on_update: replace
+
+  # 2. Push onto the global transaction stream the agent consumes.
+  - uses: redis.write
+    with:
+      connection: target
+      data_type: stream
+      key: "stream:transactions"
+
+  # 3. Capped per-card recent-transactions list (rolling window of 100).
+  - uses: redis.write
+    with:
+      connection: target
+      data_type: list
+      key: "card:{card_id}:tx:recent"
+      direction: lpush
+      cap: 100

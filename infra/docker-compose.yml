@@ -1,0 +1,114 @@
+# Fraud Command Center demo stack.
+#
+# Redis Cloud is the ONLY Redis runtime — there is no local Redis service.
+# Both the backend and RDI connect to the URL provided in REDIS_URL.
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: fcc-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-bank}
+      POSTGRES_USER: ${POSTGRES_USER:-bank}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bank}
+    # wal_level=logical is required for RDI / Debezium CDC in Wave 2.
+    command: ["postgres", "-c", "wal_level=logical"]
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/00-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bank} -d ${POSTGRES_DB:-bank}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  # Redis Data Integration: streams Postgres rows into the canonical
+  # Redis keys (customer:*, account:*, card:*, device:*, merchant:*,
+  # mcc:*, tx:*, stream:transactions, card:{id}:tx:recent) defined in
+  # the demo spec. The container reads RDI-shaped YAML from ./rdi/config
+  # so the same configuration can be lifted into the managed RDI Helm
+  # chart for production.
+  rdi:
+    build:
+      context: ./rdi
+    container_name: fcc-rdi
+    environment:
+      REDIS_URL: ${REDIS_URL}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-bank}
+      POSTGRES_USER: ${POSTGRES_USER:-bank}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bank}
+      RDI_CONFIG_DIR: /etc/rdi/config
+    volumes:
+      - ./rdi/config:/etc/rdi/config:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f processor.py > /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  backend:
+    build:
+      context: ../backend
+    container_name: fcc-backend
+    environment:
+      REDIS_URL: ${REDIS_URL}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-bank}
+      POSTGRES_USER: ${POSTGRES_USER:-bank}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bank}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/health | grep -q '\"redis\": \"ok\"' && curl -fsS http://localhost:8000/health | grep -q '\"postgres\": \"ok\"'"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  feature-worker:
+    build:
+      context: ../backend
+    container_name: fcc-feature-worker
+    environment:
+      REDIS_URL: ${REDIS_URL}
+    command: ["python", "-m", "app.feature_worker"]
+    depends_on:
+      backend:
+        condition: service_healthy
+      rdi:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../frontend
+    container_name: fcc-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/ >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+volumes:
+  postgres_data:

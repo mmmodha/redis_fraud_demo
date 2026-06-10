@@ -1,0 +1,11 @@
+name: merchant_categories
+source:
+  schema: public
+  table: merchant_categories
+output:
+  - uses: redis.write
+    with:
+      connection: target
+      data_type: json
+      key: "mcc:{code}"
+      on_update: replace

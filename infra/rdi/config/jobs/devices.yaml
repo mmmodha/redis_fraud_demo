@@ -1,0 +1,11 @@
+name: devices
+source:
+  schema: public
+  table: devices
+output:
+  - uses: redis.write
+    with:
+      connection: target
+      data_type: json
+      key: "device:{device_id}"
+      on_update: replace

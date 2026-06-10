@@ -1,0 +1,11 @@
+name: merchants
+source:
+  schema: public
+  table: merchants
+output:
+  - uses: redis.write
+    with:
+      connection: target
+      data_type: json
+      key: "merchant:{merchant_id}"
+      on_update: replace

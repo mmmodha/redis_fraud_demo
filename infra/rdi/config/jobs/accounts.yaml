@@ -1,0 +1,11 @@
+name: accounts
+source:
+  schema: public
+  table: accounts
+output:
+  - uses: redis.write
+    with:
+      connection: target
+      data_type: json
+      key: "account:{account_id}"
+      on_update: replace

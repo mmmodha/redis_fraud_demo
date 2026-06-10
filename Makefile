@@ -1,6 +1,6 @@
 COMPOSE := docker compose -f infra/docker-compose.yml --env-file .env
 
-.PHONY: demo seed seed-memory data-deps down logs ps build test
+.PHONY: demo seed seed-memory data-deps down logs ps build test rdi-status
 
 demo: .env
 	$(COMPOSE) up -d --build
