@@ -2,13 +2,14 @@ import os
 
 import psycopg
 import redis
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 
-from app import features
+from app.features_api import router as features_router
 from app.rdi import router as rdi_router
 
 app = FastAPI(title="Fraud Command Center API")
 app.include_router(rdi_router)
+app.include_router(features_router)
 
 
 def _check_redis() -> str:
@@ -44,21 +45,3 @@ def _check_postgres() -> str:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"redis": _check_redis(), "postgres": _check_postgres()}
-
-
-@app.get("/health/features")
-def health_features() -> dict:
-    try:
-        summary = features.get_store().latency_summary()
-    except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
-    return {"latency": summary}
-
-
-@app.get("/debug/features/{card_id}")
-def debug_features(card_id: str) -> dict:
-    try:
-        data = features.get_features(card_id)
-    except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc))
-    return {"card_id": card_id, "features": data}
