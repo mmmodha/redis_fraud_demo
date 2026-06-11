@@ -254,6 +254,15 @@ def _seed_devices(cur, customers: list[dict], fake: Faker, rng: random.Random) -
             "fingerprint": hero.device_fingerprint, "country": hero.device_country,
             "first_seen": now - timedelta(days=180), "last_seen": now - timedelta(hours=6),
         })
+    # Jane carries a second long-known device (her work MacBook) so the
+    # chatbot's get_devices_for_customer call surfaces a non-trivial list
+    # rather than a one-line answer.
+    devices.append({
+        "device_id": "dev_jane_macbook", "customer_id": heroes.JANE.customer_id,
+        "device_type": "desktop", "os": "macOS 14",
+        "fingerprint": "fp_jane_macbook_pro", "country": "US",
+        "first_seen": now - timedelta(days=240), "last_seen": now - timedelta(hours=20),
+    })
     bg_customers = [c for c in customers if c["customer_id"] not in {h.customer_id for h in heroes.HEROES.values()}]
     for i in range(NUM_BACKGROUND_DEVICES):
         owner = rng.choice(bg_customers)
