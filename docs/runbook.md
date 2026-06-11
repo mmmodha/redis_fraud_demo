@@ -74,6 +74,16 @@ again:
 - [ ] `AGENT_MODE=claude` in `.env` if Anthropic is reachable, otherwise
       `AGENT_MODE=stub` (see Recovery → "Anthropic API rate-limit").
 
+### 5. Proxy architecture (FYI)
+
+Browser `/api/*` calls are forwarded to the backend by a Next.js catch-all
+route handler at `frontend/app/api/[...path]/route.ts` — *not* by
+`next.config.mjs` `rewrites()`. The handler disables HTTP keep-alive and
+retries once on transient connect errors so `docker compose restart backend`
+(which gives the backend a new container IP) is invisible to the running
+frontend. Do not reintroduce `rewrites()`; it caches dead sockets and breaks
+the demo after every backend rebuild.
+
 ![Command Center landing](screenshots/command-center.png)
 
 ---
