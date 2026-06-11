@@ -117,6 +117,34 @@ def evaluate_verdict_fast(
     if impossible_travel and not matching_window:
         return {"verdict": "block", "confidence": 0.92, "signals": signals}
 
+    # Step-up route (Wave 7i): travel + device confirmed + merchant legit +
+    # no velocity violation, BUT value spike / novel MCC / behavior anomaly.
+    # Routes the gray-zone to OTP step-up instead of false-blocking.
+    amount = float(pr.get("amount") or 0)
+    p95 = float(pr.get("customer_p95_spend") or 0)
+    value_ratio_high = p95 > 0 and amount > p95 * 3
+    mcc_novel = bool(pr.get("mcc_novel_for_customer"))
+    mcc_name = pr.get("mcc_name") or pr.get("merchant_category") or "novel category"
+    memory_anomaly = bool(pr.get("behavior_memory_flags_anomaly"))
+    travel_confirmed = bool(pr.get("travel_context_confirmed"))
+    merchant_legitimate = pr.get("merchant_legitimate") is not False
+    device_known = not device_first_seen_today
+    no_velocity_violation = not impossible_travel
+    step_up_anomaly = value_ratio_high or mcc_novel or memory_anomaly
+    if (
+        travel_confirmed
+        and device_known
+        and merchant_legitimate
+        and no_velocity_violation
+        and step_up_anomaly
+    ):
+        ratio = round(amount / p95) if p95 else 0
+        signals.append(
+            f"step_up_required:travel+device_confirmed;value={ratio}x_typical;"
+            f"new_category={mcc_name}"
+        )
+        return {"verdict": "review", "confidence": 0.86, "signals": signals}
+
     # Foreign tx but customer declared the travel window → approve with the
     # explicit memory citation.
     if foreign_country and matching_window:

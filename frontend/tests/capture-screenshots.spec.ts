@@ -12,7 +12,9 @@ import { resolve } from "node:path";
 const SCREENSHOTS = resolve(__dirname, "../../docs/screenshots");
 mkdirSync(SCREENSHOTS, { recursive: true });
 
-async function runHeroAndSettle(page: Page, key: "mike" | "jane" | "alex") {
+async function runHeroAndSettle(
+  page: Page, key: "mike" | "jane" | "alex" | "sarah",
+) {
   await page.goto("/");
   await expect(page.getByTestId(`hero-card-${key}`)).toBeVisible();
   await page.getByTestId(`run-${key}`).click();
@@ -32,6 +34,48 @@ test.describe("Capture per-hero screenshots", () => {
       });
     });
   }
+
+  test("hero sarah — REVIEWED chip (pre-OTP) capture", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByTestId("hero-card-sarah")).toBeVisible();
+    await page.getByTestId("run-sarah").click();
+    const card = page.getByTestId("verdict-card");
+    await expect(card).toBeVisible({ timeout: 15_000 });
+    await expect(card).toHaveAttribute("data-verdict", "review");
+    // OTP fires ~1s after the REVIEW verdict — capture the REVIEWED-only beat
+    // before the OTP confirmed pill slides in.
+    await page.waitForTimeout(400);
+    await page.screenshot({
+      path: resolve(SCREENSHOTS, "hero-sarah-reviewed.png"),
+      fullPage: true,
+    });
+  });
+
+  test("hero sarah — APPROVED after OTP capture", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByTestId("hero-card-sarah")).toBeVisible();
+    await page.getByTestId("run-sarah").click();
+    await expect(page.getByTestId("verdict-card")).toBeVisible({ timeout: 15_000 });
+    // Wait for OTP confirmation + APPROVED chip + LLM reasoning.
+    await expect(page.getByTestId("breadcrumb-approved")).toBeVisible({ timeout: 15_000 });
+    await page.waitForTimeout(1600);
+    await page.screenshot({
+      path: resolve(SCREENSHOTS, "hero-sarah-approved.png"),
+      fullPage: true,
+    });
+  });
+
+  test("4-card row capture", async ({ page }) => {
+    await page.setViewportSize({ width: 1700, height: 1100 });
+    await page.goto("/");
+    await expect(page.getByTestId("hero-card-mike")).toBeVisible();
+    await expect(page.getByTestId("hero-card-jane")).toBeVisible();
+    await expect(page.getByTestId("hero-card-alex")).toBeVisible();
+    await expect(page.getByTestId("hero-card-sarah")).toBeVisible();
+    await page.getByTestId("hero-grid").screenshot({
+      path: resolve(SCREENSHOTS, "hero-grid-4-cards.png"),
+    });
+  });
 
   test("IRIS panels detail (jane scenario, rail close-up)", async ({ page }) => {
     await runHeroAndSettle(page, "jane");

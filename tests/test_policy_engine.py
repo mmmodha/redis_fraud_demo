@@ -83,6 +83,28 @@ def test_alex_blocks_first_seen_device_foreign():
     assert any("foreign_country:BR" in s for s in result["signals"])
 
 
+def test_sarah_step_up_review_with_travel_value_and_novel_mcc():
+    # Sarah: travel + device confirmed, no velocity violation, legit merchant —
+    # but value 5x typical + novel jewelry MCC + behavior anomaly → review.
+    pending = _pending(
+        merchant_country="US", foreign_country=False,
+        device_first_seen_today=False, impossible_travel=False,
+        device_id="dev_sarah_iphone",
+        amount=1450.0,
+        customer_p95_spend=280.0,
+        mcc_name="Jewelry & Watches",
+        mcc_novel_for_customer=True,
+        behavior_memory_flags_anomaly=True,
+        travel_context_confirmed=True,
+        merchant_legitimate=True,
+    )
+    result = evaluate_verdict_fast(
+        customer_id="cust_sarah", pending_review=pending, memory=None,
+    )
+    assert result["verdict"] == "review"
+    assert any("step_up_required" in s for s in result["signals"])
+
+
 # ---------- edge cases -----------------------------------------------------
 
 def test_no_pending_review_path_approves_even_without_memory():

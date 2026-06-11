@@ -157,6 +157,40 @@ def _seed_merchants(cur, fake: Faker, rng: random.Random) -> list[dict]:
         {"merchant_id": "merch_apple_sf", "name": "Apple Store",
          "category_code": "5311", "country": "US", "city": "San Francisco",
          "reputation_score": 95},
+        # Sarah's Seattle pattern-of-life merchants + NYC business-trip arc.
+        {"merchant_id": "merch_sarah_storyville", "name": "Storyville Coffee",
+         "category_code": "5814", "country": "US", "city": "Seattle",
+         "reputation_score": 91},
+        {"merchant_id": "merch_sarah_qfc", "name": "QFC",
+         "category_code": "5411", "country": "US", "city": "Seattle",
+         "reputation_score": 90},
+        {"merchant_id": "merch_sarah_chevron", "name": "Chevron",
+         "category_code": "5541", "country": "US", "city": "Seattle",
+         "reputation_score": 87},
+        {"merchant_id": "merch_sarah_orangetheory", "name": "Orangetheory Fitness",
+         "category_code": "5814", "country": "US", "city": "Seattle",
+         "reputation_score": 88},
+        {"merchant_id": "merch_sarah_canlis", "name": "Canlis",
+         "category_code": "5814", "country": "US", "city": "Seattle",
+         "reputation_score": 92},
+        {"merchant_id": "merch_sarah_delta", "name": "Delta Air Lines",
+         "category_code": "4511", "country": "US", "city": "Seattle",
+         "reputation_score": 92},
+        {"merchant_id": "merch_sarah_marriott_ny", "name": "Marriott Marquis",
+         "category_code": "7011", "country": "US", "city": "New York",
+         "reputation_score": 93},
+        {"merchant_id": "merch_sarah_jfk_hudson", "name": "Hudson News JFK",
+         "category_code": "5309", "country": "US", "city": "New York",
+         "reputation_score": 84},
+        {"merchant_id": "merch_sarah_manhattan_coffee", "name": "Joe Coffee Manhattan",
+         "category_code": "5814", "country": "US", "city": "New York",
+         "reputation_score": 89},
+        {"merchant_id": "merch_sarah_dc_hotel", "name": "Park Hyatt DC",
+         "category_code": "7011", "country": "US", "city": "Washington",
+         "reputation_score": 92},
+        {"merchant_id": "merch_sarah_boston_dining", "name": "Oak Long Bar Boston",
+         "category_code": "5814", "country": "US", "city": "Boston",
+         "reputation_score": 89},
     ])
     cur.executemany(
         """INSERT INTO merchants (merchant_id, name, category_code, country, city, reputation_score)
@@ -472,6 +506,86 @@ def _hero_transactions(merchants: list[dict], rng: random.Random) -> list[dict]:
             amt, "USD", "US", "San Francisco",
             is_foreign=False, is_card_present=cp, ts=ts,
         ))
+
+    # Sarah: Seattle pattern-of-life + quarterly East Coast business trips.
+    # 90-day p95 lands around $280 — well below the $1,450 Tiffany trigger so
+    # the step-up rule fires deterministically.
+    sarah_storyville = by_id["merch_sarah_storyville"]
+    sarah_qfc = by_id["merch_sarah_qfc"]
+    sarah_chevron = by_id["merch_sarah_chevron"]
+    sarah_otf = by_id["merch_sarah_orangetheory"]
+    sarah_canlis = by_id["merch_sarah_canlis"]
+    sarah_delta = by_id["merch_sarah_delta"]
+    sarah_marriott = by_id["merch_sarah_marriott_ny"]
+    sarah_dc_hotel = by_id["merch_sarah_dc_hotel"]
+    sarah_boston = by_id["merch_sarah_boston_dining"]
+    sarah_jfk_hudson = by_id["merch_sarah_jfk_hudson"]
+    sarah_manhattan_coffee = by_id["merch_sarah_manhattan_coffee"]
+
+    # 12 routine Seattle small CP spends across 90 days.
+    sarah_local = [
+        (sarah_storyville, 5.75),
+        (sarah_storyville, 6.25),
+        (sarah_qfc, 62.40),
+        (sarah_qfc, 41.10),
+        (sarah_chevron, 48.20),
+        (sarah_chevron, 52.00),
+        (sarah_otf, 159.00),
+        (sarah_canlis, 218.00),
+        (sarah_storyville, 5.25),
+        (sarah_qfc, 78.50),
+        (sarah_chevron, 44.30),
+        (sarah_canlis, 265.00),
+    ]
+    for i, (m, amt) in enumerate(sarah_local):
+        ts = now - timedelta(days=rng.randint(5, 88), hours=rng.randint(7, 21))
+        rows.append(_tx_row(
+            f"tx_sarah_local_{i:02d}", heroes.SARAH.customer_id, heroes.SARAH.account_id,
+            heroes.SARAH.card_id, m, heroes.SARAH.primary_device_id,
+            amt, "USD", "US", "Seattle",
+            is_foreign=False, is_card_present=True, ts=ts,
+        ))
+
+    # 9 East Coast business-trip charges — dining + hotels + airline.
+    # NOTE: no retail / no jewelry — those categories are NOVEL for her.
+    sarah_trips = [
+        (sarah_delta,    420.00, "Seattle"),
+        (sarah_marriott, 280.00, "New York"),
+        (sarah_marriott, 280.00, "New York"),
+        (sarah_dc_hotel, 245.00, "Washington"),
+        (sarah_dc_hotel, 245.00, "Washington"),
+        (sarah_boston,   118.00, "Boston"),
+        (sarah_boston,    92.00, "Boston"),
+        (sarah_delta,    380.00, "Seattle"),
+        (sarah_marriott, 260.00, "New York"),
+    ]
+    for i, (m, amt, city) in enumerate(sarah_trips):
+        ts = now - timedelta(days=rng.randint(20, 85), hours=rng.randint(8, 22))
+        rows.append(_tx_row(
+            f"tx_sarah_trip_{i:02d}", heroes.SARAH.customer_id, heroes.SARAH.account_id,
+            heroes.SARAH.card_id, m, heroes.SARAH.primary_device_id,
+            amt, "USD", "US", city,
+            is_foreign=False, is_card_present=False if m is sarah_delta else True, ts=ts,
+        ))
+
+    # Sarah current-trip arc — the forward-looking story for Context Retriever:
+    # flight 2 days ago, hotel check-in yesterday, airport + Manhattan coffee
+    # earlier today.
+    sarah_arc = [
+        # (suffix, merchant, amount, country, city, is_card_present, hours_ago)
+        ("flight",   sarah_delta,          438.00, "US", "Seattle",   False, 52),
+        ("hotel",    sarah_marriott,       310.00, "US", "New York",  False, 26),
+        ("jfk",      sarah_jfk_hudson,      14.00, "US", "New York",  True,   5),
+        ("manhattan_coffee", sarah_manhattan_coffee, 7.50, "US", "New York", True, 3),
+    ]
+    for suffix, m, amt, country, city, cp, hrs in sarah_arc:
+        ts = now - timedelta(hours=hrs)
+        rows.append(_tx_row(
+            f"tx_sarah_arc_{suffix}", heroes.SARAH.customer_id, heroes.SARAH.account_id,
+            heroes.SARAH.card_id, m, heroes.SARAH.primary_device_id,
+            amt, "USD", country, city,
+            is_foreign=False, is_card_present=cp, ts=ts,
+        ))
     return rows
 
 
@@ -510,9 +624,12 @@ def _background_transactions(customers, accounts, cards, devices, merchants, rng
 
 
 def _seed_memory(cur) -> None:
-    cur.execute(
+    cur.executemany(
         "INSERT INTO customer_memory_seed (customer_id, memory_json) VALUES (%s, %s)",
-        (heroes.JANE.customer_id, json.dumps(heroes.JANE_MEMORY_SEED)),
+        [
+            (heroes.JANE.customer_id, json.dumps(heroes.JANE_MEMORY_SEED)),
+            (heroes.SARAH.customer_id, json.dumps(heroes.SARAH_MEMORY_SEED)),
+        ],
     )
 
 

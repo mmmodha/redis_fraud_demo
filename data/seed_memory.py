@@ -107,6 +107,7 @@ _DISPUTE_SEED: dict[str, list[dict]] = {
     heroes.MIKE.customer_id: [],
     heroes.JANE.customer_id: [],
     heroes.ALEX.customer_id: [],
+    heroes.SARAH.customer_id: [],
     "cust_bg_0007": [
         {
             "dispute_id": "disp_bg_0007_001",
@@ -168,17 +169,17 @@ def seed_disputes(client: redis.Redis | None = None) -> dict[str, int]:
 
 
 def seed_pending_review(client: redis.Redis | None = None) -> dict[str, int]:
-    """Stage the Alex trigger transaction as a pending review record.
+    """Stage the Alex + Sarah trigger transactions as pending review records.
 
-    Mirrors the BR electronics trigger spec in ``data.heroes`` but is written
-    Redis-only (no Postgres row, no commit to settled history).
+    Mirrors the trigger specs in ``data.heroes`` but is written Redis-only
+    (no Postgres row, no commit to settled history).
     """
     client = client or _redis_client()
     occurred_at = (datetime.now(timezone.utc) - timedelta(minutes=2)).strftime(
         "%Y-%m-%dT%H:%M:%SZ"
     )
     alex_trigger = heroes.TRIGGERS["alex"]
-    pending = {
+    alex_pending = {
         "transaction_id": "tx_alex_pending_br_electronics",
         "customer_id": heroes.ALEX.customer_id,
         "amount": 1240.00,
@@ -193,15 +194,40 @@ def seed_pending_review(client: redis.Redis | None = None) -> dict[str, int]:
         "impossible_travel": True,
         "occurred_at": occurred_at,
     }
+    sarah_trigger = heroes.TRIGGERS["sarah"]
+    sarah_pending = {
+        "transaction_id": "tx_sarah_pending_tiffany_ny",
+        "customer_id": heroes.SARAH.customer_id,
+        "amount": sarah_trigger.amount,
+        "currency": sarah_trigger.currency,
+        "merchant_name": sarah_trigger.merchant_name,
+        "merchant_country": sarah_trigger.merchant_country,
+        "merchant_city": sarah_trigger.merchant_city,
+        "merchant_category": sarah_trigger.merchant_category,
+        "device_id": heroes.SARAH.primary_device_id,
+        "device_first_seen_today": False,
+        "foreign_country": False,
+        "impossible_travel": False,
+        # Step-up signals the policy engine reads.
+        "customer_p95_spend": 280.00,
+        "mcc_name": "Jewelry & Watches",
+        "mcc_novel_for_customer": True,
+        "behavior_memory_flags_anomaly": True,
+        "travel_context_confirmed": True,
+        "merchant_legitimate": True,
+        "occurred_at": occurred_at,
+    }
     written = 0
     skipped = 0
-    ok = client.json().set(
-        f"pending_review:{heroes.ALEX.customer_id}", "$", pending, nx=True
-    )
-    if ok:
-        written += 1
-    else:
-        skipped += 1
+    for cust_id, pending in (
+        (heroes.ALEX.customer_id, alex_pending),
+        (heroes.SARAH.customer_id, sarah_pending),
+    ):
+        ok = client.json().set(f"pending_review:{cust_id}", "$", pending, nx=True)
+        if ok:
+            written += 1
+        else:
+            skipped += 1
     return {"written": written, "skipped": skipped}
 
 
@@ -255,6 +281,15 @@ _MIKE_NOTES = (
     "Spotify; no foreign spend ever observed",
 )
 
+_SARAH_NOTES = (
+    "customer baseline: Seattle pattern-of-life — coffee, grocery, gas, "
+    "gym, dining; quarterly East Coast business trips (hotel + dining + "
+    "airport) — no retail, no jewelry, no foreign spend",
+    "step-up policy: high-value retail anomalies during travel should "
+    "route to OTP step-up rather than block — false-blocking on Sarah's "
+    "travel days has high CLV cost",
+)
+
 _JANE_PAST_TRAVEL_NOTE = (
     "Customer declared prior travel: Tokyo, 14–22 May 2026 "
     "(returned without incident) — pattern of declaring trips ahead of time."
@@ -275,6 +310,7 @@ def seed_hero_memory_enrichment(
     for customer_id, notes in (
         (heroes.ALEX.customer_id, _ALEX_NOTES),
         (heroes.MIKE.customer_id, _MIKE_NOTES),
+        (heroes.SARAH.customer_id, _SARAH_NOTES),
     ):
         _ensure_mem_skeleton(client, customer_id)
         for text in notes:

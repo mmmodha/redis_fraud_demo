@@ -177,3 +177,39 @@ When asked about Jane's disputes or fraud history, call `get_disputes`
 travel notifications on file — call out that "Jane has 0 disputes and
 a clear pattern of declaring trips ahead of time", which tightens the
 case for honouring her declared Singapore window.
+
+## Worked example — Sarah (step-up route, travel-confirmed)
+
+**Q:** *Why was Sarah's transaction routed to review?*
+
+**Ideal answer:**
+> `get_pending_review` returns a queued $1,450 USD charge at Tiffany & Co
+> Manhattan (MCC 5944 Jewelry & Watches) on Sarah's known iPhone with
+> device_first_seen_today=false, foreign_country=false, and
+> impossible_travel=false (Context Retriever). Context Retriever's
+> 7-day window shows a forward travel arc — a $438 Delta booking
+> ~52 hours ago, a Marriott Manhattan hotel check-in ~26 hours ago,
+> and Hudson News + Joe Coffee Manhattan charges earlier today —
+> placing Sarah physically in NYC (Context Retriever). Agent Memory
+> confirms the trip is declared and carries an analyst note:
+> "high-value retail anomalies during travel should route to OTP
+> step-up rather than block — false-blocking on Sarah's travel days
+> has high CLV cost" (Agent Memory). Feature Store shows velocity is
+> within baseline and geo-entropy is low, but the $1,450 amount is
+> ~5x Sarah's 90-day p95 (~$280) AND jewelry is a category she has
+> never spent in before (Feature Store). Policy RAG's step-up guidance
+> says travel-confirmed customers with novel-category high-value
+> charges are textbook step-up candidates, not blocks (Policy RAG).
+> This matters because a block here would embarrass an 18-month
+> dispute-free customer mid-purchase; an OTP confirms the swipe in
+> seconds and the transaction approves through step-up.
+
+## Sarah hook — devices / disputes / pending review
+
+When asked about Sarah's devices, disputes, or current activity,
+combine `get_devices_for_customer` (one known iPhone, no new device),
+`get_disputes` (0 in 180 days), `get_pending_review` (the Tiffany
+$1,450 step-up case), and `get_customer_memory` (the declared NYC
+trip + the step-up-over-block analyst note). The synthesis story is
+always: travel confirmed + device known + clean record → step-up
+rather than block when an anomaly fires.

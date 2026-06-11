@@ -1,8 +1,8 @@
 # Presenter Runbook — Fraud Command Center
 
 Single page. Read it once the morning of the webinar; you should not need to
-re-read it on stage. The whole demo is ~12 minutes: 3 minutes per hero
-customer + 3 minutes for the chatbot comparison.
+re-read it on stage. The whole demo is ~15 minutes: 3 minutes per hero
+customer (four heroes) + 3 minutes for the chatbot comparison.
 
 > **Mantra (memorize this line):** *Same Claude model. Same policy docs.
 > Different context.*
@@ -181,10 +181,39 @@ policy docs, different context."* (gesture to the trace and IRIS rail).
 
 ![Alex hero](screenshots/hero-alex.png)
 
-> **Tab switch tip:** After Jane or Alex, switch to **Redis Cloud
-> Console → Context Retriever** and show the audience the entities
-> and tools you just saw the agent call. That's the *"this is in the
-> product"* beat.
+### Beat 4 — Sarah Kim 🟡 *(the step-up moment)*
+
+- **What to click:** Sarah's card → **Run scenario**.
+- **Before run:** *"What do you think? Approve, step-up, or block?"*
+  Expected audience split: ~50/50 between approve and block. Sarah's
+  bio is friendly (18 months clean, business traveller) but the
+  scenario is a high-value retail charge in a city she doesn't live
+  in — most rooms split.
+- **After verdict:** *"REVIEW — step-up auth. The verdict you didn't
+  see coming, and the most important one in the real world."* Watch
+  the **REVIEWED** chip land, then the **OTP confirmed** pill slide
+  in ~1s later, then the final **APPROVED** chip land — all three
+  pills stay visible side-by-side as the journey breadcrumb.
+- **What to say:** *"$1,450 Tiffany & Co Manhattan on Sarah's known
+  iPhone. Travel context is confirmed in Agent Memory, the device is
+  trusted, but the value is ~5x her typical spend and jewelry is a
+  category she's never used. Block would embarrass her mid-purchase.
+  Approve would be sloppy. Redis routes her to step-up, the OTP
+  comes back confirmed, and the transaction goes through."*
+- **Point at:** the **Agent Memory** panel (the analyst note about
+  step-up-over-block on travel days) and the **Feature Store** panel
+  (5x value spike + novel MCC).
+- **Expected verdict:** `REVIEW` → OTP confirms → `APPROVED via
+  Step-Up Auth`. All three breadcrumb pills permanently visible.
+- **Closing line:** *"A false block doesn't just cost you the
+  transaction. It costs you Sarah. Step-up is the difference between
+  'sorry, can you confirm?' and 'sorry, we just lost a 5-year
+  customer.'"*
+
+> **Tab switch tip:** After Jane, Alex, or Sarah, switch to **Redis
+> Cloud Console → Context Retriever** and show the audience the
+> entities and tools you just saw the agent call. That's the
+> *"this is in the product"* beat.
 
 ---
 

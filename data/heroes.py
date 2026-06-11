@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 
-HeroKey = Literal["mike", "jane", "alex"]
+HeroKey = Literal["mike", "jane", "alex", "sarah"]
 
 
 @dataclass(frozen=True)
@@ -97,8 +97,25 @@ ALEX = HeroProfile(
     device_country="US",
 )
 
+SARAH = HeroProfile(
+    key="sarah",
+    customer_id="cust_sarah",
+    name="Sarah Kim",
+    email="sarah.kim@example.com",
+    home_country="US",
+    home_city="Seattle",
+    account_id="acct_sarah_chk",
+    card_id="card_sarah_visa",
+    card_last4="9911",
+    primary_device_id="dev_sarah_iphone",
+    device_fingerprint="fp_sarah_iphone_15",
+    device_country="US",
+)
 
-HEROES: dict[HeroKey, HeroProfile] = {"mike": MIKE, "jane": JANE, "alex": ALEX}
+
+HEROES: dict[HeroKey, HeroProfile] = {
+    "mike": MIKE, "jane": JANE, "alex": ALEX, "sarah": SARAH,
+}
 
 
 # Triggered "next transaction" specs — match the demo storyboard in the spec note.
@@ -147,6 +164,19 @@ TRIGGERS: dict[HeroKey, TriggerSpec] = {
         device_type="mobile",
         device_fingerprint="fp_unknown_android_pixel",
     ),
+    "sarah": TriggerSpec(
+        merchant_id="merch_sarah_tiffany_ny",
+        merchant_name="Tiffany & Co Manhattan",
+        merchant_category="5944",  # jewelry — high risk MCC, novel for Sarah
+        merchant_country="US",
+        merchant_city="New York",
+        amount=1450.00,
+        currency="USD",
+        country="US",
+        city="New York",
+        is_foreign=False,
+        is_card_present=True,
+    ),
 }
 
 
@@ -159,4 +189,33 @@ JANE_MEMORY_SEED = {
         }
     ],
     "travel_window": {"start": "2026-11-10", "end": "2026-11-17", "destination": "Singapore"},
+}
+
+
+SARAH_MEMORY_SEED = {
+    "notes": [
+        {
+            "text": (
+                "Sarah's business trips skew toward dining + transit + hotels. "
+                "Flag high-value retail anomalies during travel for step-up "
+                "rather than block — false-blocking on her travel days has "
+                "high CLV cost."
+            ),
+            "source": "analyst",
+            "tags": ["step-up", "travel", "clv"],
+        },
+        {
+            "text": (
+                "Business trip in progress: Seattle → New York, "
+                "flight booked 2 days ago, Manhattan hotel checked in yesterday."
+            ),
+            "source": "chat",
+            "tags": ["travel", "new-york"],
+        },
+    ],
+    "travel_window": {
+        "start": "2026-06-09",
+        "end": "2026-06-13",
+        "destination": "New York",
+    },
 }
