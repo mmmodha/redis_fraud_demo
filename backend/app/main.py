@@ -4,12 +4,22 @@ import psycopg
 import redis
 from fastapi import FastAPI
 
+from app.api import deps as api_deps
+from app.api.agent import router as agent_router
+from app.api.chat import router as chat_router
 from app.features_api import router as features_router
 from app.rdi import router as rdi_router
 
 app = FastAPI(title="Fraud Command Center API")
 app.include_router(rdi_router)
 app.include_router(features_router)
+app.include_router(agent_router)
+app.include_router(chat_router)
+
+
+@app.on_event("shutdown")
+async def _shutdown() -> None:
+    await api_deps.shutdown()
 
 
 def _check_redis() -> str:

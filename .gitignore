@@ -1,11 +1,23 @@
 # Dependencies
 node_modules/
 .pnpm-store/
+.venv/
+venv/
+*.egg-info/
 
 # Build outputs
 dist/
 build/
 out/
+.next/
+.turbo/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
 # IDE
 .idea/

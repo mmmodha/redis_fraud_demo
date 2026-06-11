@@ -68,6 +68,8 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-bank}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bank}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      CTX_AGENT_KEY: ${CTX_AGENT_KEY:-}
+      CTX_ADMIN_KEY: ${CTX_ADMIN_KEY:-}
     ports:
       - "8000:8000"
     depends_on:

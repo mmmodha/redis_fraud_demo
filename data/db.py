@@ -6,8 +6,8 @@ import os
 from contextlib import contextmanager
 from typing import Iterator
 
-import psycopg2
-from psycopg2.extensions import connection as PgConnection
+import psycopg
+from psycopg import Connection as PgConnection
 
 
 def database_url() -> str:
@@ -23,7 +23,7 @@ def database_url() -> str:
 
 
 def connect() -> PgConnection:
-    return psycopg2.connect(database_url())
+    return psycopg.connect(database_url())
 
 
 @contextmanager

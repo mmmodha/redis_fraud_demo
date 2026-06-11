@@ -1,6 +1,6 @@
 COMPOSE := docker compose -f infra/docker-compose.yml --env-file .env
 
-.PHONY: demo seed seed-memory data-deps down logs ps build test rdi-status
+.PHONY: demo seed seed-memory data-deps down logs ps build test rdi-status context-up ui ui-test ui-test-headed policy-index backend-deps
 
 demo: .env
 	$(COMPOSE) up -d --build
@@ -44,6 +44,46 @@ rdi-status:
 test:
 	pip install -r backend/requirements-dev.txt
 	pytest tests/ -v
+
+# Provision the Redis Context Retriever surface + agent key. Runs inside a
+# one-shot Docker container so the presenter doesn't need Python 3.11+ on
+# the host. Idempotent: a second run reuses the existing surface and mints
+# a fresh agent key. See docs/context-retriever-setup.md.
+context-up: .env
+	@bash scripts/context-up.sh
+
+# Install backend deps locally (used by policy-index when not running in Docker).
+backend-deps:
+	pip install -r backend/requirements.txt
+
+# Drop and rebuild the RediSearch policy index `idx:policies` from
+# data/policies/*.md. Idempotent — safe to re-run after a corpus update.
+# Sources .env (for REDIS_URL) inside the shell so the value never appears in
+# command-line arguments.
+policy-index: .env
+	@set -a; . ./.env; set +a; \
+	  python scripts/build_policy_index.py
+
+# Run the Next.js frontend dev server. Defaults to port 3030 to avoid
+# conflicting with the Docker frontend container (port :3000). The
+# docker-compose `frontend` service is the production target; use this
+# for hot-reload iteration. Set FRONTEND_PORT=3000 to override after
+# stopping the docker container (see docs/README.md).
+ui:
+	cd frontend && npm install --no-audit --no-fund --silent
+	cd frontend && PORT=$${FRONTEND_PORT:-3030} \
+		NEXT_PUBLIC_BACKEND_URL=$${NEXT_PUBLIC_BACKEND_URL:-http://localhost:8000} \
+		npm run dev -- -p $${FRONTEND_PORT:-3030}
+
+# Playwright smoke tests. Headless by default (CI mode); use ui-test-headed
+# during development to watch the browser.
+ui-test:
+	cd frontend && npx playwright install --with-deps chromium >/dev/null 2>&1 || true
+	cd frontend && npx playwright test
+
+ui-test-headed:
+	cd frontend && npx playwright install --with-deps chromium >/dev/null 2>&1 || true
+	cd frontend && npx playwright test --headed
 
 .env:
 	@echo "ERROR: .env is missing. Copy .env.example to .env and set REDIS_URL." >&2
