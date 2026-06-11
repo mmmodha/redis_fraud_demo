@@ -66,13 +66,42 @@ again:
 
 ## The three beats (≈3 min each)
 
-The dashboard puts all three customers side-by-side. There's no linear
-script — pick a customer, hit **Run scenario**, narrate while the IRIS
-panels populate (staggered ~200 ms each). Repeat for the next customer.
+The dashboard puts all three customers side-by-side. Each card now
+runs as a **quiz**: bio + in-flight scenario only — no verdict spoiler
+until you hit **Run scenario**. The card animates the verdict chip in
+~250 ms (fast path), then the LLM-narrated reason fills in afterward.
+
+### Demo arc — the misdirection
+
+Use the three beats as a sequence, not three independent demos:
+
+1. **Mike calibrates the room.** Boring scenario, the audience guesses
+   *approve* and gets it right. Establishes that the system can be
+   trusted on the easy cases.
+2. **Jane flips them toward block.** Foreign country + luxury merchant
+   looks like fraud at a glance. Most of the audience will call
+   *block*. Redis says **approve** because Agent Memory holds Jane's
+   declared travel window + the departure-arc evidence.
+3. **Alex flips them toward approve.** Friendly bio (five-year
+   customer, zero disputes, software engineer) tempts the audience
+   toward *approve*. Redis says **block** because the Feature Store
+   surfaces a first-seen device + impossible-travel velocity, and the
+   Context Retriever shows Alex has never travelled internationally.
+
+Each beat below uses the same two-cue pattern:
+**Before run:** *"What do you think? Approve, step-up, or block?"*
+(pause, let the room commit). **After verdict reveals:** *"Let's see
+what our agent says…"* — then — *"Now let's see why: same model, same
+policy docs, different context."* (gesture to the trace and IRIS rail).
 
 ### Beat 1 — Mike Rivera 🟢 *(steady state)*
 
 - **What to click:** Mike's card → **Run scenario**.
+- **Before run:** *"What do you think? Approve, step-up, or block?"*
+  (audience guesses approve correctly).
+- **After verdict:** *"Let's see what our agent says…"* — `APPROVE`
+  lands instantly. *"Now let's see why — same model, same policy docs,
+  different context."*
 - **What to say:** *"A bank runs millions of decisions like this every
   day. Routine $6.75 coffee in Austin — the Feature Store says 'normal
   velocity, normal merchant, normal geo' and the agent approves in
@@ -88,6 +117,11 @@ panels populate (staggered ~200 ms each). Repeat for the next customer.
 ### Beat 2 — Jane Doe 🟡 *(the near-miss)*
 
 - **What to click:** Jane's card → **Run scenario**.
+- **Before run:** *"What do you think? Approve, step-up, or block?"*
+  (most of the room will call **block** — foreign + luxury).
+- **After verdict:** *"Let's see what our agent says…"* — `APPROVE`
+  drops in. Pause for the audience reaction. *"Now let's see why —
+  same model, same policy docs, different context."*
 - **What to say:** *"$480 luxury boutique in Singapore. By features
   alone this screams fraud — foreign country, high amount. Watch what
   Redis does."*
@@ -105,6 +139,11 @@ panels populate (staggered ~200 ms each). Repeat for the next customer.
 ### Beat 3 — Alex Chen 🔴 *(fraud caught)*
 
 - **What to click:** Alex's card → **Run scenario**.
+- **Before run:** *"What do you think? Approve, step-up, or block?"*
+  (the friendly bio tempts the room toward **approve**).
+- **After verdict:** *"Let's see what our agent says…"* — `BLOCK`
+  lands. *"Now let's see why — same model, same policy docs, different
+  context."*
 - **What to say:** *"$2,400 electronics in Brazil, from a device Alex
   has never used before. All four IRIS layers turn red — velocity
   spike, new device, high-risk merchant, unknown geo."*
