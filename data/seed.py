@@ -35,6 +35,7 @@ MERCHANT_CATEGORIES = [
     ("4111", "Local & Suburban Transit", "low"),
     ("5311", "Department Stores", "low"),
     ("5309", "Duty-Free Stores", "medium"),
+    ("5815", "Digital Goods & Software Subscriptions", "low"),
     ("4511", "Airlines & Air Carriers", "medium"),
     ("7011", "Hotels & Lodging", "medium"),
     ("5651", "Family Clothing Stores", "medium"),
@@ -121,6 +122,41 @@ def _seed_merchants(cur, fake: Faker, rng: random.Random) -> list[dict]:
         {"merchant_id": "merch_sfo_lounge", "name": "SFO Skyline Lounge",
          "category_code": "5814", "country": "US", "city": "San Francisco",
          "reputation_score": 86},
+        # Mike's pattern-of-life merchants (Austin).
+        {"merchant_id": "merch_heb_austin", "name": "H-E-B",
+         "category_code": "5411", "country": "US", "city": "Austin",
+         "reputation_score": 92},
+        {"merchant_id": "merch_tacodeli", "name": "Tacodeli",
+         "category_code": "5814", "country": "US", "city": "Austin",
+         "reputation_score": 89},
+        {"merchant_id": "merch_shell_austin", "name": "Shell",
+         "category_code": "5541", "country": "US", "city": "Austin",
+         "reputation_score": 88},
+        {"merchant_id": "merch_spotify", "name": "Spotify",
+         "category_code": "5815", "country": "US", "city": "Austin",
+         "reputation_score": 90},
+        # Alex's quiet US-only baseline merchants (San Francisco).
+        {"merchant_id": "merch_bluebottle", "name": "Blue Bottle Coffee",
+         "category_code": "5814", "country": "US", "city": "San Francisco",
+         "reputation_score": 91},
+        {"merchant_id": "merch_bart", "name": "BART",
+         "category_code": "4111", "country": "US", "city": "San Francisco",
+         "reputation_score": 93},
+        {"merchant_id": "merch_wholefoods_sf", "name": "Whole Foods Market",
+         "category_code": "5411", "country": "US", "city": "San Francisco",
+         "reputation_score": 92},
+        {"merchant_id": "merch_github", "name": "GitHub",
+         "category_code": "5815", "country": "US", "city": "San Francisco",
+         "reputation_score": 90},
+        {"merchant_id": "merch_sightglass", "name": "Sightglass Coffee",
+         "category_code": "5814", "country": "US", "city": "San Francisco",
+         "reputation_score": 89},
+        {"merchant_id": "merch_tartine", "name": "Tartine Bakery",
+         "category_code": "5814", "country": "US", "city": "San Francisco",
+         "reputation_score": 90},
+        {"merchant_id": "merch_apple_sf", "name": "Apple Store",
+         "category_code": "5311", "country": "US", "city": "San Francisco",
+         "reputation_score": 95},
     ])
     cur.executemany(
         """INSERT INTO merchants (merchant_id, name, category_code, country, city, reputation_score)
@@ -275,6 +311,33 @@ def _hero_transactions(merchants: list[dict], rng: random.Random) -> list[dict]:
             is_foreign=False, is_card_present=True, ts=ts,
         ))
 
+    # Mike pattern-of-life arc — dense 3-day cluster of routine Austin spend
+    # (coffee 3x, grocery, lunch, gas, Spotify recurring) so the context-surface
+    # chatbot can answer "what's Mike's typical spend?" with concrete patterns.
+    mike_coffee = by_id["merch_mike_coffee"]
+    mike_heb = by_id["merch_heb_austin"]
+    mike_tacodeli = by_id["merch_tacodeli"]
+    mike_shell = by_id["merch_shell_austin"]
+    mike_spotify = by_id["merch_spotify"]
+    mike_arc = [
+        # (suffix, merchant, amount, hours_ago)
+        ("coffee_1", mike_coffee,    5.50, 66),
+        ("grocery",  mike_heb,      42.00, 66),
+        ("coffee_2", mike_coffee,    5.50, 42),
+        ("lunch",    mike_tacodeli, 14.25, 42),
+        ("gas",      mike_shell,    38.00, 42),
+        ("coffee_3", mike_coffee,    5.50, 18),
+        ("spotify",  mike_spotify,  10.99,  2),
+    ]
+    for suffix, m, amt, hrs in mike_arc:
+        ts = now - timedelta(hours=hrs)
+        rows.append(_tx_row(
+            f"tx_mike_arc_{suffix}", heroes.MIKE.customer_id, heroes.MIKE.account_id,
+            heroes.MIKE.card_id, m, heroes.MIKE.primary_device_id,
+            amt, "USD", "US", "Austin",
+            is_foreign=False, is_card_present=True, ts=ts,
+        ))
+
     # Jane: travel-heavy history — past airline + hotel bookings + a few SGD spends.
     jane_airline = by_id["merch_global_airways"]
     jane_hotel = by_id["merch_marina_bay_hotel"]
@@ -368,6 +431,37 @@ def _hero_transactions(merchants: list[dict], rng: random.Random) -> list[dict]:
             heroes.ALEX.card_id, m, heroes.ALEX.primary_device_id,
             amt, "USD", m["country"], m["city"],
             is_foreign=False, is_card_present=True, ts=ts,
+        ))
+
+    # Alex quiet baseline arc — dense 3-day cluster of SF-only, card-present
+    # (except the one recurring GitHub sub) spend on his primary device, so the
+    # trigger BR-electronics charge lands as a maximally jarring anomaly across
+    # device, country, category, and card-present axes simultaneously.
+    alex_bluebottle = by_id["merch_bluebottle"]
+    alex_bart = by_id["merch_bart"]
+    alex_wholefoods = by_id["merch_wholefoods_sf"]
+    alex_github = by_id["merch_github"]
+    alex_sightglass = by_id["merch_sightglass"]
+    alex_tartine = by_id["merch_tartine"]
+    alex_apple = by_id["merch_apple_sf"]
+    alex_arc = [
+        # (suffix, merchant, amount, is_card_present, hours_ago)
+        ("bluebottle", alex_bluebottle,  5.00, True,  70),
+        ("bart_1",     alex_bart,        4.10, True,  68),
+        ("wholefoods", alex_wholefoods, 87.40, True,  50),
+        ("github",     alex_github,     10.00, False, 50),
+        ("sightglass", alex_sightglass,  6.25, True,  30),
+        ("tartine",    alex_tartine,    14.00, True,  30),
+        ("apple",      alex_apple,      98.00, True,  18),
+        ("bart_2",     alex_bart,        4.10, True,   2),
+    ]
+    for suffix, m, amt, cp, hrs in alex_arc:
+        ts = now - timedelta(hours=hrs)
+        rows.append(_tx_row(
+            f"tx_alex_arc_{suffix}", heroes.ALEX.customer_id, heroes.ALEX.account_id,
+            heroes.ALEX.card_id, m, heroes.ALEX.primary_device_id,
+            amt, "USD", "US", "San Francisco",
+            is_foreign=False, is_card_present=cp, ts=ts,
         ))
     return rows
 
