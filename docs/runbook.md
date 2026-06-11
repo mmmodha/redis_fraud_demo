@@ -28,6 +28,20 @@ print or screen-share the values):
 `.env.example` at the repo root is the canonical list — copy it, fill it
 in, never commit it.
 
+#### Customizing TopBar links for your tenancy
+
+The three links in the page header are sourced from `NEXT_PUBLIC_*` env
+vars baked at frontend build time. Set `NEXT_PUBLIC_REDIS_CLOUD_URL` (your
+Redis Cloud database "Open Database" URL), `NEXT_PUBLIC_CONTEXT_RETRIEVER_URL`
+(your Context Retriever surface page), and `NEXT_PUBLIC_GITHUB_URL` (this
+demo's repo) in `.env`. Leave Context Retriever / GitHub blank to hide those
+links. After changing any of them, rebuild the frontend:
+
+```bash
+docker compose -f infra/docker-compose.yml --env-file .env build frontend
+docker compose -f infra/docker-compose.yml --env-file .env up -d frontend
+```
+
 ### 2. Bring the stack up
 
 ```bash

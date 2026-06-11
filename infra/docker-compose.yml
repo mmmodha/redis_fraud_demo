@@ -101,6 +101,10 @@ services:
   frontend:
     build:
       context: ../frontend
+      args:
+        NEXT_PUBLIC_REDIS_CLOUD_URL: ${NEXT_PUBLIC_REDIS_CLOUD_URL:-https://app.redislabs.com/}
+        NEXT_PUBLIC_CONTEXT_RETRIEVER_URL: ${NEXT_PUBLIC_CONTEXT_RETRIEVER_URL:-}
+        NEXT_PUBLIC_GITHUB_URL: ${NEXT_PUBLIC_GITHUB_URL:-}
     container_name: fcc-frontend
     ports:
       - "3000:3000"
