@@ -34,6 +34,7 @@ MERCHANT_CATEGORIES = [
     ("5541", "Service Stations (Fuel)", "low"),
     ("4111", "Local & Suburban Transit", "low"),
     ("5311", "Department Stores", "low"),
+    ("5309", "Duty-Free Stores", "medium"),
     ("4511", "Airlines & Air Carriers", "medium"),
     ("7011", "Hotels & Lodging", "medium"),
     ("5651", "Family Clothing Stores", "medium"),
@@ -96,7 +97,8 @@ def _seed_merchants(cur, fake: Faker, rng: random.Random) -> list[dict]:
             "city": spec.merchant_city,
             "reputation_score": 50,
         })
-    # Plus a couple of recurring travel/luxury merchants used by Jane's history.
+    # Plus a couple of recurring travel/luxury merchants used by Jane's history,
+    # and the SFO departure-arc merchants for her last-72h cluster.
     merchants.extend([
         {"merchant_id": "merch_global_airways", "name": "Global Airways",
          "category_code": "4511", "country": "US", "city": "San Francisco",
@@ -107,6 +109,18 @@ def _seed_merchants(cur, fake: Faker, rng: random.Random) -> list[dict]:
         {"merchant_id": "merch_orchard_cafe", "name": "Orchard Cafe",
          "category_code": "5814", "country": "SG", "city": "Singapore",
          "reputation_score": 85},
+        {"merchant_id": "merch_rideshare", "name": "RideNow Rideshare",
+         "category_code": "4111", "country": "US", "city": "San Francisco",
+         "reputation_score": 87},
+        {"merchant_id": "merch_sfo_cafe", "name": "SFO Terminal Cafe",
+         "category_code": "5814", "country": "US", "city": "San Francisco",
+         "reputation_score": 88},
+        {"merchant_id": "merch_sfo_dutyfree", "name": "SFO International Duty-Free",
+         "category_code": "5309", "country": "US", "city": "San Francisco",
+         "reputation_score": 84},
+        {"merchant_id": "merch_sfo_lounge", "name": "SFO Skyline Lounge",
+         "category_code": "5814", "country": "US", "city": "San Francisco",
+         "reputation_score": 86},
     ])
     cur.executemany(
         """INSERT INTO merchants (merchant_id, name, category_code, country, city, reputation_score)
@@ -304,6 +318,40 @@ def _hero_transactions(merchants: list[dict], rng: random.Random) -> list[dict]:
             heroes.JANE.card_id, m, heroes.JANE.primary_device_id,
             amt, "USD", "US", "San Francisco",
             is_foreign=False, is_card_present=True, ts=ts,
+        ))
+
+    # Jane departure arc — dense 3-day cluster (T-72h..T-2h) that plants the
+    # "she's flying to Singapore" narrative for the context-surface chatbot:
+    # recent airline + foreign-hotel bookings are forward geo signals, then
+    # rideshare + airport spend traces her physical path to SFO.
+    sf_coffee = next(
+        (m for m in jane_us_low if m["category_code"] == "5814"), jane_us_low[0]
+    )
+    sf_grocery = next(
+        (m for m in jane_us_low if m["category_code"] == "5411"), jane_us_low[0]
+    )
+    jane_rideshare = by_id["merch_rideshare"]
+    jane_sfo_cafe = by_id["merch_sfo_cafe"]
+    jane_sfo_dutyfree = by_id["merch_sfo_dutyfree"]
+    jane_sfo_lounge = by_id["merch_sfo_lounge"]
+    departure_arc = [
+        # (suffix, merchant, amount, currency, country, city, is_foreign, is_card_present, hours_ago)
+        ("coffee",     sf_coffee,         5.25, "USD", "US", "San Francisco", False, True,  72),
+        ("airline",    jane_airline,   2140.00, "USD", "US", "San Francisco", False, False, 50),
+        ("hotel",      jane_hotel,      680.00, "SGD", "SG", "Singapore",     True,  False, 48),
+        ("grocery",    sf_grocery,       45.30, "USD", "US", "San Francisco", False, True,  30),
+        ("rideshare",  jane_rideshare,   87.00, "USD", "US", "San Francisco", False, False, 12),
+        ("sfo_cafe",   jane_sfo_cafe,    18.00, "USD", "US", "San Francisco", False, True,   6),
+        ("sfo_duty",   jane_sfo_dutyfree, 340.00,"USD", "US", "San Francisco", False, True,  4),
+        ("sfo_lounge", jane_sfo_lounge,  58.00, "USD", "US", "San Francisco", False, True,   2),
+    ]
+    for suffix, m, amt, cur_, country, city, is_foreign, cp, hrs in departure_arc:
+        ts = now - timedelta(hours=hrs)
+        rows.append(_tx_row(
+            f"tx_jane_arc_{suffix}", heroes.JANE.customer_id, heroes.JANE.account_id,
+            heroes.JANE.card_id, m, heroes.JANE.primary_device_id,
+            amt, cur_, country, city,
+            is_foreign=is_foreign, is_card_present=cp, ts=ts,
         ))
 
     # Alex: ~25 clean US-only tx, never high-risk, never foreign — so the trigger
