@@ -5,13 +5,27 @@ COMPOSE := docker compose -f infra/docker-compose.yml --env-file .env
 demo: .env
 	$(COMPOSE) up -d --build
 	@echo ""
-	@echo "Waiting for services to become healthy..."
-	@sleep 5
-	$(COMPOSE) ps
+	@echo "Waiting for backend to become healthy (max 90 s)..."
+	@for i in $$(seq 1 30); do \
+	  if curl -fsS http://localhost:8000/health >/dev/null 2>&1; then \
+	    echo "  backend healthy"; break; \
+	  fi; \
+	  sleep 3; \
+	done
+	@echo "Waiting for frontend to become reachable (max 30 s)..."
+	@for i in $$(seq 1 10); do \
+	  if curl -fsS http://localhost:3000/ >/dev/null 2>&1; then \
+	    echo "  frontend reachable"; break; \
+	  fi; \
+	  sleep 3; \
+	done
+	@$(COMPOSE) ps
 	@echo ""
 	@echo "Backend  : http://localhost:8000/health"
 	@echo "Frontend : http://localhost:3000"
-	@command -v open >/dev/null && open http://localhost:3000 || true
+	@if command -v open >/dev/null 2>&1; then open http://localhost:3000; \
+	 elif command -v xdg-open >/dev/null 2>&1; then xdg-open http://localhost:3000; \
+	 fi
 
 data-deps:
 	pip install -r data/requirements.txt

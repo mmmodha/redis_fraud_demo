@@ -1,0 +1,202 @@
+# Presenter Runbook — Fraud Command Center
+
+Single page. Read it once the morning of the webinar; you should not need to
+re-read it on stage. The whole demo is ~12 minutes: 3 minutes per hero
+customer + 3 minutes for the chatbot comparison.
+
+> **Mantra (memorize this line):** *Same Claude model. Same policy docs.
+> Different context.*
+
+---
+
+## Pre-flight (T-30 min)
+
+### 1. Environment
+
+`.env` must contain values for the following variable **names** (never
+print or screen-share the values):
+
+| Variable             | Purpose                                                    |
+| -------------------- | ---------------------------------------------------------- |
+| `REDIS_URL`          | Redis Cloud connection string                              |
+| `CTX_ADMIN_KEY`      | Context Retriever admin key (only needed for `make context-up`) |
+| `CTX_SURFACE_ID`     | Auto-filled by `make context-up`                           |
+| `CTX_AGENT_KEY`      | Auto-filled by `make context-up`                           |
+| `ANTHROPIC_API_KEY`  | Claude Sonnet key (required when `AGENT_MODE=claude`)      |
+| `AGENT_MODE`         | `claude` (live demo) or `stub` (offline rehearsal fallback) |
+
+`.env.example` at the repo root is the canonical list — copy it, fill it
+in, never commit it.
+
+### 2. Bring the stack up
+
+```bash
+docker compose -f infra/docker-compose.yml --env-file .env up -d --build
+# or simply:
+make demo
+```
+
+`make demo` waits for backend health, then opens
+<http://localhost:3000> automatically.
+
+### 3. First-run-only one-shots
+
+Run these **once per fresh checkout / fresh Redis Cloud DB**, then never
+again:
+
+| Command            | When to run it                                                |
+| ------------------ | ------------------------------------------------------------- |
+| `make seed`        | Postgres is empty (no `cust_mike` / `cust_jane` / `cust_alex`).|
+| `make context-up`  | Context Retriever surface not provisioned (no `CTX_AGENT_KEY` in `.env`). |
+| `make policy-index`| RediSearch `idx:policies` missing or after a policy-doc edit. |
+
+### 4. Sanity checklist (60 seconds)
+
+- [ ] <http://localhost:3000> loads and the three hero cards render.
+- [ ] Clicking **Run scenario** on Jane returns an `APPROVE` verdict in <1 s.
+- [ ] Redis Insight (presenter side, not in the repo) is connected to the
+      same Redis Cloud DB and can browse `customer:cust_jane`,
+      `mem:cust_jane`, and `stream:transactions`.
+- [ ] `AGENT_MODE=claude` in `.env` if Anthropic is reachable, otherwise
+      `AGENT_MODE=stub` (see Recovery → "Anthropic API rate-limit").
+
+![Command Center landing](screenshots/command-center.png)
+
+---
+
+## The three beats (≈3 min each)
+
+The dashboard puts all three customers side-by-side. There's no linear
+script — pick a customer, hit **Run scenario**, narrate while the IRIS
+panels populate (staggered ~200 ms each). Repeat for the next customer.
+
+### Beat 1 — Mike Rivera 🟢 *(steady state)*
+
+- **What to click:** Mike's card → **Run scenario**.
+- **What to say:** *"A bank runs millions of decisions like this every
+  day. Routine $6.75 coffee in Austin — the Feature Store says 'normal
+  velocity, normal merchant, normal geo' and the agent approves in
+  sub-50 ms. No human in the loop."*
+- **Point at:** the **Feature Store** panel — emphasize that the keys
+  came from `feat:card_mike_visa`.
+- **Expected verdict:** `APPROVE` with high confidence.
+- **Why this matters:** the boring path. Most decisions never touch a
+  human because Redis answered "is this normal?" in single-digit ms.
+
+![Mike hero](screenshots/hero-mike.png)
+
+### Beat 2 — Jane Doe 🟡 *(the near-miss)*
+
+- **What to click:** Jane's card → **Run scenario**.
+- **What to say:** *"$480 luxury boutique in Singapore. By features
+  alone this screams fraud — foreign country, high amount. Watch what
+  Redis does."*
+- **Point at:** the **Context Retriever** panel (calls populate live)
+  and then the **Agent Memory** panel showing
+  `Memory: 'travelling 10–17 Nov to Singapore'`.
+- **Expected verdict:** `APPROVE` — flipped from the naive "block"
+  because of memory + merchant reputation.
+- **Why this matters:** the **false-positive cost** moment. Without
+  IRIS, the bank blocks Jane mid-transaction, embarrasses her in front
+  of a shop assistant, and loses her loyalty.
+
+![Jane hero](screenshots/hero-jane.png)
+
+### Beat 3 — Alex Chen 🔴 *(fraud caught)*
+
+- **What to click:** Alex's card → **Run scenario**.
+- **What to say:** *"$2,400 electronics in Brazil, from a device Alex
+  has never used before. All four IRIS layers turn red — velocity
+  spike, new device, high-risk merchant, unknown geo."*
+- **Point at:** the **Feature Store** panel (velocity red) and the
+  **Context Retriever** panel (`devices_seen_for_customer` returns an
+  unknown device).
+- **Expected verdict:** `BLOCK`. Account flagged for step-up auth.
+- **Why this matters:** the **false-negative cost** avoided. The
+  decision is sub-second; the card is denied before the swipe
+  completes.
+
+![Alex hero](screenshots/hero-alex.png)
+
+> **Tab switch tip:** After Jane or Alex, switch to **Redis Cloud
+> Console → Context Retriever** and show the audience the entities
+> and tools you just saw the agent call. That's the *"this is in the
+> product"* beat.
+
+---
+
+## The chatbot comparison (≈3 min)
+
+The bottom-of-page Insight Chatbot runs the **same question through two
+pipelines in parallel** — naive RAG (policy docs only) vs. Context
+Surface (policy docs + live customer context). Both call the same
+Claude model.
+
+Stay on Jane for this. Click the four pre-loaded prompts **in order**:
+
+1. **"Any upcoming travel?"** → Context Surface mentions *Singapore,
+   10–17 Nov*. RAG says it can't tell you that — policy docs don't know
+   Jane.
+2. **"What's their typical spend?"** → Context Surface cites Jane's
+   recent transactions. RAG quotes a generic AML guideline.
+3. **"Are there any disputes?"** → Context Surface checks Agent
+   Memory + recent tx. RAG generic.
+4. **"Is this card showing new devices?"** → Context Surface lists
+   Jane's known devices. RAG generic.
+
+After turn 1, **deliver the mantra**:
+
+> *"Same Claude model. Same policy docs. Different context. That's
+> the difference IRIS makes."*
+
+![Chatbot comparison](screenshots/chatbot-comparison.png)
+
+Right rail close-up — show this if the audience asks "which Redis
+layer does what":
+
+![IRIS panels detail](screenshots/iris-panels-detail.png)
+
+---
+
+## Recovery playbook
+
+| Symptom                                       | Fix                                                                                                                                      |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Backend container died                        | `docker compose -f infra/docker-compose.yml restart backend`, then re-run the hero. Health: `curl http://localhost:8000/health`.        |
+| Port :3000 already in use (e.g. `frtb-sbm-redis-pov-ui-1` on this laptop) | `docker stop frtb-sbm-redis-pov-ui-1` (or whichever container), then `make demo` again.                                                  |
+| Anthropic API rate-limit / 5xx                | Edit `.env` → set `AGENT_MODE=stub` → `docker compose -f infra/docker-compose.yml restart backend`. The verdicts are deterministic and identical to the live demo. |
+| Redis Cloud feels slow                        | Don't apologize — switch to the **Redis Insight** tab and walk the keys (`customer:cust_jane`, `mem:cust_jane`, `stream:transactions`). The audience sees data is live. |
+| `BACKEND DOWN` badge in top-right             | Cosmetic only — if hero cards still return verdicts, ignore it. The badge polls `/health` from the browser and may lag during the first 10 s after restart. |
+| Chat returns "Thinking…" forever              | Refresh the page. Check `docker logs fcc-backend` for an Anthropic error — fall back to `AGENT_MODE=stub` if persistent.                  |
+| Need to wipe everything and start over        | `make down` (drops Postgres volume) → `make demo` → `make seed`.                                                                          |
+
+---
+
+## Stage choreography
+
+Three browser tabs, foregrounded in this order:
+
+| Tab                                | When foreground                                            |
+| ---------------------------------- | ---------------------------------------------------------- |
+| 1. <http://localhost:3000>         | Default — all three beats and the chatbot comparison.      |
+| 2. Redis Cloud Console → Context Retriever | After Beat 2 (Jane) — show the entities & tools.    |
+| 3. Redis Insight                   | If Redis Cloud is slow, OR as a closer — browse `customer:*`, `mem:*`, `feat:*`, `stream:transactions` to prove the data is in Redis right now. |
+
+**Closing line** (after the chatbot comparison):
+
+> *"Sub-second fraud decisions, powered by real-time context. That's
+> Redis IRIS."*
+
+---
+
+## Files referenced
+
+- [`README.md`](../README.md) — repo overview + 5-minute quickstart.
+- [`docs/context-retriever-setup.md`](context-retriever-setup.md) —
+  bootstrapping the Context Retriever surface.
+- [`docs/agent-memory.md`](agent-memory.md) — Agent Memory schema +
+  seeded fixtures.
+- [`docs/talking-points.md`](talking-points.md) — the 10 quotable lines
+  in one place for the webinar.
+- [`scripts/capture-screenshots.sh`](../scripts/capture-screenshots.sh) —
+  re-run to refresh all six PNGs in this doc.
