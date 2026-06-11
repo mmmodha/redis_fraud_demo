@@ -136,6 +136,46 @@ def test_alex_new_device_in_24h_flags_one():
     assert feats["mcc_top_3"].split(",")[0] == "5411"  # legit pattern still dominates
 
 
+# ---------- out-of-order ingest (event-time vs ingest-time) -----------------
+
+
+def test_velocity_uses_event_time_not_ingest_order():
+    """Wave 3c regression: if RDI delivers history in burst order, the velocity
+    window of an OLDER event must not absorb "future" events that happen to be
+    further along the timeline. ``feat:{card}.velocity_1h`` is bounded by the
+    event's own ``ts``, not by the open-ended ``s >= ts - 1h`` lower edge alone.
+    """
+    r = _fake_redis()
+    now = _now()
+    # 30 transactions, one per day, but ingested oldest-first then *future-most*
+    # last so the trailing event is the "May 7"-equivalent in the middle of the
+    # series — mirroring what the live demo observed (velocity_1h=19 on Mike).
+    days = list(range(30))
+    rng_order = days[:15] + list(reversed(days[15:]))
+    for processing_idx, day_offset in enumerate(rng_order):
+        ts = now - day_offset * 86400
+        feature_worker.update_for_transaction(
+            r,
+            _tx(
+                "card_event_time", tx_id=f"tx_evt_{processing_idx:03d}",
+                amount=10.0, country="US", mcc="5814",
+                device_id="dev_evt", ts=ts,
+            ),
+        )
+    feats = FeatureStore(r).get_features("card_event_time")
+    # The last-processed event's ts is day 15 (somewhere in the middle of the
+    # timeline). With the bug, velocity_1h would equal the number of events with
+    # a *later* ts already in the zset (≥ ~14). With the fix it is exactly 1
+    # because no other event shares its 1h window.
+    assert feats["velocity_1h"] == 1
+    # 24h window: only the current event is within (events are 1 day apart and
+    # the upper bound is the event's own ts, so the day-16 neighbour at exactly
+    # ``ts - 86400`` is the boundary — both 1 and 2 are acceptable.
+    assert feats["velocity_24h"] in (1, 2)
+    # 7d window at day 15 covers days 15..22 (inclusive boundaries).
+    assert feats["velocity_7d"] == 8
+
+
 # ---------- read latency / API ----------------------------------------------
 
 

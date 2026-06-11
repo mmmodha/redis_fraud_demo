@@ -155,13 +155,19 @@ def update_for_transaction(r: redis.Redis, tx: dict) -> Optional[str]:
             continue
         entries.append((data, float(score)))
 
-    count_1h = sum(1 for _, s in entries if s >= ts - WINDOW_1H)
-    count_24h = sum(1 for _, s in entries if s >= ts - WINDOW_24H)
-    count_7d = sum(1 for _, s in entries if s >= ts - WINDOW_7D)
+    # Velocity counts use the transaction's event time, not its ingest time:
+    # bound by ``s <= ts`` so out-of-order ingest of historical events does not
+    # let "future" rows leak into the rolling window of an older one.
+    count_1h = sum(1 for _, s in entries if ts - WINDOW_1H <= s <= ts)
+    count_24h = sum(1 for _, s in entries if ts - WINDOW_24H <= s <= ts)
+    count_7d = sum(1 for _, s in entries if ts - WINDOW_7D <= s <= ts)
 
     amounts_30d = [float(e["amount"]) for e, _ in entries]
     avg_30d = sum(amounts_30d) / len(amounts_30d) if amounts_30d else 0.0
-    max_24h = max((float(e["amount"]) for e, s in entries if s >= ts - WINDOW_24H), default=0.0)
+    max_24h = max(
+        (float(e["amount"]) for e, s in entries if ts - WINDOW_24H <= s <= ts),
+        default=0.0,
+    )
 
     countries_30d = [e["country"] for e, _ in entries if e["country"]]
     geo_ent = shannon_entropy_normalized(countries_30d)
