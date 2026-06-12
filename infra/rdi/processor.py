@@ -158,7 +158,11 @@ def apply_outputs(r: redis.Redis, outputs: list[dict], row: dict | None, op: str
         if data_type == "json":
             r.json().set(key, "$", coerced)
         elif data_type == "stream":
-            r.xadd(key, _stream_fields(coerced))
+            maxlen = int(spec.get("maxlen", 0) or 0)
+            if maxlen > 0:
+                r.xadd(key, _stream_fields(coerced), maxlen=maxlen, approximate=True)
+            else:
+                r.xadd(key, _stream_fields(coerced))
         elif data_type == "list":
             cap = int(spec.get("cap", 0) or 0)
             payload = json.dumps(coerced)
@@ -235,7 +239,11 @@ def _seed_one_row(pipe: redis.client.Pipeline, outputs: list[dict], row: dict,
         if data_type == "json":
             pipe.json().set(key, "$", coerced)
         elif data_type == "stream":
-            pipe.xadd(key, _stream_fields(coerced))
+            maxlen = int(spec.get("maxlen", 0) or 0)
+            if maxlen > 0:
+                pipe.xadd(key, _stream_fields(coerced), maxlen=maxlen, approximate=True)
+            else:
+                pipe.xadd(key, _stream_fields(coerced))
         elif data_type == "list":
             payload = json.dumps(coerced)
             if spec.get("direction", "lpush") == "rpush":

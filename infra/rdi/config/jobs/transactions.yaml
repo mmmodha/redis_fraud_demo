@@ -12,11 +12,15 @@ output:
       on_update: replace
 
   # 2. Push onto the global transaction stream the agent consumes.
+  #    `maxlen` uses approximate trimming (XADD ... MAXLEN ~ N) so Redis Cloud
+  #    can't drift into maxmemory on a long-running seed; ~5000 is well above
+  #    a normal demo's working set yet capped well below the per-shard quota.
   - uses: redis.write
     with:
       connection: target
       data_type: stream
       key: "stream:transactions"
+      maxlen: 5000
 
   # 3. Capped per-card recent-transactions list (rolling window of 100).
   - uses: redis.write

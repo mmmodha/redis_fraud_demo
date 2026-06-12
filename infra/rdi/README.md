@@ -33,7 +33,7 @@ infra/rdi/
 | `devices`              | `device:{device_id}`                                                    | JSON                   |
 | `merchants`            | `merchant:{merchant_id}` (includes `reputation_score`)                  | JSON                   |
 | `merchant_categories`  | `mcc:{code}`                                                            | JSON                   |
-| `transactions`         | `tx:{transaction_id}` + `XADD stream:transactions` + `LPUSH card:{card_id}:tx:recent` (capped at 100) | JSON + Stream + List   |
+| `transactions`         | `tx:{transaction_id}` + `XADD stream:transactions` (MAXLEN ~ 5000) + `LPUSH card:{card_id}:tx:recent` (capped at 100) | JSON + Stream + List   |
 
 ## How it works
 
