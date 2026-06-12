@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 from pathlib import Path
 from typing import Any, AsyncIterator, Optional
@@ -82,11 +83,124 @@ def _history_to_messages(history: Optional[list[ChatMessage]]) -> list[dict[str,
     return [{"role": m.role, "content": m.content} for m in history]
 
 
+_VERDICT_VALUES = ("approve", "review", "block")
+_VERDICT_REGEX = re.compile(
+    r'"verdict"\s*:\s*"(approve|review|block)"', re.IGNORECASE,
+)
+_CONFIDENCE_REGEX = re.compile(r'"confidence"\s*:\s*([0-9]*\.?[0-9]+)')
+
+
+def _find_top_level_json_objects(s: str) -> list[str]:
+    """Return every balanced top-level ``{...}`` substring in ``s``.
+
+    A naive ``find("{")`` / ``rfind("}")`` scan can either grab the wrong
+    block (when a markdown preamble has its own ``{``) or merge two
+    independent objects together (when Claude appends a prose JSON
+    afterthought). A real balanced scan that respects JSON string quoting
+    is the only correct way to enumerate candidates.
+    """
+    out: list[str] = []
+    depth = 0
+    start = -1
+    i = 0
+    n = len(s)
+    in_str = False
+    while i < n:
+        c = s[i]
+        if in_str:
+            if c == "\\" and i + 1 < n:
+                i += 2
+                continue
+            if c == '"':
+                in_str = False
+        else:
+            if c == '"':
+                in_str = True
+            elif c == "{":
+                if depth == 0:
+                    start = i
+                depth += 1
+            elif c == "}":
+                if depth > 0:
+                    depth -= 1
+                    if depth == 0 and start != -1:
+                        out.append(s[start : i + 1])
+                        start = -1
+        i += 1
+    return out
+
+
+def _escape_unescaped_newlines_in_strings(s: str) -> str:
+    """Convert raw ``\\n`` / ``\\r`` / ``\\t`` inside JSON string literals
+    to their escaped form so ``json.loads`` can parse them.
+
+    Claude is instructed to emit ``\\n`` for line breaks inside the
+    ``reason`` field, but it occasionally lapses into raw newlines when
+    the prompt asks for multi-paragraph markdown. The rest of the JSON
+    structure stays untouched.
+    """
+    out: list[str] = []
+    in_str = False
+    i = 0
+    n = len(s)
+    while i < n:
+        c = s[i]
+        if in_str:
+            if c == "\\" and i + 1 < n:
+                out.append(c)
+                out.append(s[i + 1])
+                i += 2
+                continue
+            if c == '"':
+                in_str = False
+                out.append(c)
+            elif c == "\n":
+                out.append("\\n")
+            elif c == "\r":
+                out.append("\\r")
+            elif c == "\t":
+                out.append("\\t")
+            else:
+                out.append(c)
+        else:
+            if c == '"':
+                in_str = True
+            out.append(c)
+        i += 1
+    return "".join(out)
+
+
+def _try_load_json(candidate: str) -> Optional[dict[str, Any]]:
+    """Best-effort ``json.loads``. Retries once with raw whitespace
+    inside string literals re-escaped before giving up.
+    """
+    try:
+        return json.loads(candidate)
+    except json.JSONDecodeError:
+        pass
+    try:
+        return json.loads(_escape_unescaped_newlines_in_strings(candidate))
+    except json.JSONDecodeError:
+        return None
+
+
 def _parse_verdict_payload(text: str) -> tuple[Verdict, float, str]:
     """Extract ``{verdict, confidence, reason}`` from Claude's final message.
 
-    Tolerates a leading/trailing prose paragraph as long as a JSON object
-    with the three required keys appears somewhere in the message body.
+    Hardened in Wave 7k.1 to survive three observed failure modes:
+
+    * Raw newlines inside the JSON ``reason`` string — pre-escape them
+      before retrying ``json.loads``.
+    * Markdown preamble or code fence wrapping the JSON — strip fences and
+      enumerate every balanced top-level ``{...}`` substring, preferring
+      the LAST one that carries a valid ``verdict``.
+    * Prose afterthought trailing the JSON — same balanced-brace scan
+      ignores anything outside top-level objects.
+
+    Final fallback: regex-extract just ``verdict`` (and optionally
+    ``confidence``) so a malformed body never silently degrades to a
+    ``review`` verdict on what should have been a clean ``approve`` /
+    ``block``.
     """
     candidate = text.strip()
     # Strip ```json fences if present.
@@ -95,17 +209,33 @@ def _parse_verdict_payload(text: str) -> tuple[Verdict, float, str]:
         if candidate.lower().startswith("json"):
             candidate = candidate[4:]
         candidate = candidate.strip()
-    try:
-        obj = json.loads(candidate)
-    except json.JSONDecodeError:
-        # Fall back to scanning for the first {...} block.
-        start = candidate.find("{")
-        end = candidate.rfind("}")
-        if start == -1 or end == -1 or end <= start:
+
+    obj: Optional[dict[str, Any]] = _try_load_json(candidate)
+
+    if obj is None:
+        # Enumerate every balanced top-level {...} block and prefer the
+        # LAST one that has a valid verdict — Claude sometimes precedes
+        # the real JSON with an example or a partial draft.
+        for block in reversed(_find_top_level_json_objects(candidate)):
+            parsed = _try_load_json(block)
+            if isinstance(parsed, dict) and parsed.get("verdict") in _VERDICT_VALUES:
+                obj = parsed
+                break
+
+    if obj is None:
+        # Last-ditch: regex out the verdict so the demo doesn't silently
+        # degrade to a manual-review fallback on a malformed body.
+        m = _VERDICT_REGEX.search(candidate)
+        if m is None:
             raise ValueError(f"final message is not JSON: {text!r}")
-        obj = json.loads(candidate[start : end + 1])
+        verdict = m.group(1).lower()
+        conf_m = _CONFIDENCE_REGEX.search(candidate)
+        confidence = float(conf_m.group(1)) if conf_m else 0.5
+        confidence = max(0.0, min(1.0, confidence))
+        return verdict, confidence, candidate.strip()
+
     verdict = obj.get("verdict")
-    if verdict not in ("approve", "review", "block"):
+    if verdict not in _VERDICT_VALUES:
         raise ValueError(f"invalid verdict {verdict!r} in final message")
     confidence = float(obj.get("confidence", 0.0))
     confidence = max(0.0, min(1.0, confidence))
