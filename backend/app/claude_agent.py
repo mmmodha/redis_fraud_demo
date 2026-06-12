@@ -16,7 +16,7 @@ import json
 import os
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, AsyncIterator, Optional
 
 from anthropic import AsyncAnthropic
 
@@ -138,6 +138,27 @@ class ClaudeAgent:
         customer_id: str,
         transaction: Optional[TransactionPayload],
     ) -> ScoreResponse:
+        final: Optional[ScoreResponse] = None
+        async for event in self.score_stream(customer_id, transaction):
+            if event["type"] == "final":
+                final = event["response"]
+        assert final is not None, "score_stream must yield a final event"
+        return final
+
+    async def score_stream(
+        self,
+        customer_id: str,
+        transaction: Optional[TransactionPayload],
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Same behaviour as :meth:`score` but yields progress events.
+
+        Event shapes:
+          ``{"type": "thinking", "round": N}`` — emitted before each LLM
+          ``messages.create`` call (presenter beat during the 5–10s waits).
+          ``{"type": "step", "step": TraceStep}`` — emitted as each LLM round
+          and each tool invocation resolves.
+          ``{"type": "final", "response": ScoreResponse}`` — terminal event.
+        """
         system = _load_prompt("fraud_agent.md")
         user_text = (
             "Decide on the following transaction.\n\n"
@@ -150,19 +171,27 @@ class ClaudeAgent:
         messages: list[dict[str, Any]] = [{"role": "user", "content": user_text}]
         steps: list[TraceStep] = []
         t0 = time.perf_counter()
-        final = await self._run_loop(system, messages, AGENT_TOOL_SCHEMAS, steps)
+        final_text = ""
+        async for ev in self._run_loop_events(system, messages, AGENT_TOOL_SCHEMAS, steps):
+            if ev["type"] == "final_text":
+                final_text = ev["text"]
+            else:
+                yield ev
         try:
-            verdict, confidence, reason = _parse_verdict_payload(final)
+            verdict, confidence, reason = _parse_verdict_payload(final_text)
         except ValueError:
             verdict, confidence, reason = (
                 "review",
                 0.5,
-                f"Agent did not return a parseable verdict. Raw response: {final[:400]}",
+                f"Agent did not return a parseable verdict. Raw response: {final_text[:400]}",
             )
-        return ScoreResponse(
-            verdict=verdict, confidence=confidence, reason=reason,
-            trace=self._finalise(steps, t0),
-        )
+        yield {
+            "type": "final",
+            "response": ScoreResponse(
+                verdict=verdict, confidence=confidence, reason=reason,
+                trace=self._finalise(steps, t0),
+            ),
+        }
 
     # --- /chat/context-surface --------------------------------------------
 
@@ -217,8 +246,34 @@ class ClaudeAgent:
         tools: list[dict[str, Any]],
         steps: list[TraceStep],
     ) -> str:
-        """Drive the messages.create / tool_result loop until Claude stops."""
+        """Drive the messages.create / tool_result loop until Claude stops.
+
+        Thin collector around :meth:`_run_loop_events` for callers (chat
+        endpoints) that don't need progressive event emission.
+        """
+        final_text = ""
+        async for ev in self._run_loop_events(system, messages, tools, steps):
+            if ev["type"] == "final_text":
+                final_text = ev["text"]
+        return final_text
+
+    async def _run_loop_events(
+        self,
+        system: str,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        steps: list[TraceStep],
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Generator version of :meth:`_run_loop`.
+
+        Yields ``thinking`` events before each LLM call and ``step`` events
+        as each LLM round + tool call resolves. Terminates with a single
+        ``final_text`` event carrying the agent's final assistant text.
+        """
+        round_num = 0
         for _ in range(MAX_ITERATIONS):
+            round_num += 1
+            yield {"type": "thinking", "round": round_num}
             llm_start = time.perf_counter()
             resp = await self._client.messages.create(
                 model=self._model,
@@ -233,7 +288,7 @@ class ClaudeAgent:
             in_tok = int(getattr(usage, "input_tokens", 0) or 0) if usage else 0
             out_tok = int(getattr(usage, "output_tokens", 0) or 0) if usage else 0
             stop_reason = getattr(resp, "stop_reason", None)
-            steps.append(TraceStep(
+            llm_step = TraceStep(
                 component="llm",
                 tool="anthropic.messages.create",
                 input={"model": self._model, "num_tools": len(tools)},
@@ -247,7 +302,9 @@ class ClaudeAgent:
                 },
                 latency_ms=llm_ms,
                 redis_keys_touched=[],
-            ))
+            )
+            steps.append(llm_step)
+            yield {"type": "step", "step": llm_step}
 
             content = list(resp.content or [])
             tool_uses = [b for b in content if getattr(b, "type", None) == "tool_use"]
@@ -258,7 +315,8 @@ class ClaudeAgent:
                     b.text for b in content
                     if getattr(b, "type", None) == "text"
                 ]
-                return "\n".join(text_parts).strip()
+                yield {"type": "final_text", "text": "\n".join(text_parts).strip()}
+                return
 
             # Echo the assistant turn back into the conversation, then
             # execute every tool_use and feed the results back as one
@@ -276,6 +334,7 @@ class ClaudeAgent:
                         tool_name, dict(tool_input), backends=self._backends,
                     )
                     steps.append(trace)
+                    yield {"type": "step", "step": trace}
                     result_text = _serialise_tool_result(payload)
                     is_error = False
                 except Exception as exc:  # noqa: BLE001
@@ -289,10 +348,13 @@ class ClaudeAgent:
                 })
             messages.append({"role": "user", "content": tool_result_blocks})
 
-        return (
-            "Agent did not converge to a final answer within the iteration "
-            "budget. Returning a manual-review fallback."
-        )
+        yield {
+            "type": "final_text",
+            "text": (
+                "Agent did not converge to a final answer within the iteration "
+                "budget. Returning a manual-review fallback."
+            ),
+        }
 
 
 __all__ = ["ClaudeAgent", "DEFAULT_MODEL"]
