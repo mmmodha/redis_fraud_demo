@@ -5,6 +5,14 @@ Redis Cloud and confirming the auto-generated MCP tools are reachable from the
 backend. Skip ahead to **Re-pointing a fresh laptop** if the surface already
 exists and you just need a new agent key.
 
+> **Heads-up:** `make demo` now wraps `make context-up` automatically when both
+> `CTX_ADMIN_KEY` and `REDIS_URL` are set in `.env` (idempotent — re-uses the
+> surface on subsequent runs). The manual `make context-up` flow below still
+> works unchanged; use it when you want to provision the surface without
+> rebuilding the whole stack. Set `CTX_SURFACE_NAME` in `.env` to label the
+> surface (useful when sharing a Redis Cloud tenant); defaults to
+> `fraud-command-center`.
+
 ---
 
 ## 1. One-time admin-key generation (Redis Cloud)
@@ -95,13 +103,19 @@ make context-up
 `CTX_SURFACE_ID`, and mints a new `CTX_AGENT_KEY` for this laptop. The previous
 laptop's agent key is unaffected.
 
-To target a **different** surface name (e.g. for a staging demo), edit the two
-constants near the top of `infra/context-retriever/bootstrap.py`:
+To target a **different** surface name (e.g. for a staging demo, or when
+sharing a Redis Cloud tenant with another colleague), set `CTX_SURFACE_NAME`
+in `.env` and re-run `make context-up` (or `make demo`):
 
-```python
-SURFACE_NAME = "fraud-command-center"
-AGENT_NAME = "fraud-agent"
+```bash
+echo 'CTX_SURFACE_NAME=mehul-fraud' >> .env
+make context-up
 ```
+
+The bootstrap finds-or-creates by name, so a new value provisions a SECOND
+surface; the original `fraud-command-center` is left untouched. The
+`AGENT_NAME` constant in `infra/context-retriever/bootstrap.py` is still the
+only way to change the per-agent label.
 
 ---
 

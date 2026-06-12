@@ -39,6 +39,7 @@ echo "Running bootstrap (provisions surface + agent key; idempotent)..."
 docker run --rm \
   -e CTX_ADMIN_KEY \
   -e REDIS_URL \
+  -e CTX_SURFACE_NAME \
   -e CTX_ENV_FILE=/work/.env \
   -v "${ENV_FILE}:/work/.env" \
   -v "${REPO_ROOT}/backend:/work/backend:ro" \

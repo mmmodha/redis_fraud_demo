@@ -30,7 +30,7 @@ from context_surfaces import (
 sys.path.insert(0, "/work/backend")
 from app import context_models  # noqa: E402
 
-SURFACE_NAME = "fraud-command-center"
+SURFACE_NAME = os.environ.get("CTX_SURFACE_NAME", "").strip() or "fraud-command-center"
 AGENT_NAME = "fraud-agent"
 ENV_FILE = Path(os.environ.get("CTX_ENV_FILE", "/work/.env"))
 

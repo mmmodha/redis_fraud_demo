@@ -49,6 +49,34 @@ API keys, no managed services.**
 Toggling between bundled and opt-in is one env var at a time. See
 [Architecture](#architecture) for where each toggle takes effect.
 
+### Opt-in: real Redis Cloud Context Retriever
+
+With Redis Cloud creds in `.env`, `make demo` also auto-provisions a
+Context Retriever surface in Redis Cloud (idempotent — finds-or-creates
+by name).
+
+- **Required:** `REDIS_URL` (`rediss://...`) and `CTX_ADMIN_KEY` (from
+  Redis Cloud → Context Retriever → Manage admin keys).
+- **Optional:** `CTX_SURFACE_NAME` — surface label so multiple colleagues
+  sharing a Redis Cloud tenant don't collide. Defaults to
+  `fraud-command-center`.
+- **Auto-written by the bootstrap:** `CTX_SURFACE_ID` and
+  `CTX_AGENT_KEY` (written straight to `.env`, never logged in
+  plaintext).
+
+```dotenv
+REDIS_URL=rediss://default:<password>@<host>:<port>
+CTX_ADMIN_KEY=<admin-key-from-redis-cloud>
+CTX_SURFACE_NAME=mehul-fraud   # optional; default: fraud-command-center
+# CTX_SURFACE_ID / CTX_AGENT_KEY are written by the bootstrap
+```
+
+Leaving `CTX_ADMIN_KEY` blank skips Context Retriever entirely (stub
+mode); leaving `REDIS_URL` blank while `CTX_ADMIN_KEY` is set is an
+error — `make demo` halts before touching the stack. See
+[`docs/context-retriever-setup.md`](docs/context-retriever-setup.md)
+for the full walkthrough.
+
 ---
 
 ## Quick start (5 steps)
