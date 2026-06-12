@@ -25,7 +25,8 @@ BEGIN
                    ELSE 'd'
                  END,
         'pk_col', pk_col,
-        'pk_val', pk_val
+        'pk_val', pk_val,
+        'pg_emit_ms', (EXTRACT(EPOCH FROM clock_timestamp()) * 1000)::bigint
     )::text;
     PERFORM pg_notify('rdi_changes', payload);
     IF (TG_OP = 'DELETE') THEN RETURN OLD; ELSE RETURN NEW; END IF;

@@ -102,19 +102,22 @@ def load_jobs() -> list[Job]:
 class Stats:
     events: int = 0
     last_event_at: float | None = None
+    last_lag_ms: int | None = None
     started_at: float = field(default_factory=time.time)
     lock: threading.Lock = field(default_factory=threading.Lock)
 
-    def bump(self) -> None:
+    def bump(self, lag_ms: int) -> None:
         with self.lock:
             self.events += 1
             self.last_event_at = time.time()
+            self.last_lag_ms = lag_ms
 
     def snapshot(self) -> dict:
         with self.lock:
             return {
                 "events_total": self.events,
                 "last_event_at": _ts(self.last_event_at),
+                "last_lag_ms": self.last_lag_ms,
                 "started_at": _ts(self.started_at),
             }
 
@@ -258,7 +261,7 @@ def seed_initial(jobs: list[Job], r: redis.Redis, stats: Stats) -> None:
                 for row in rows:
                     _seed_one_row(pipe, job.outputs, dict(row), caps)
                     n += 1
-                    stats.bump()
+                    stats.bump(0)
                     if n % SEED_BATCH == 0:
                         pipe.execute()
                         pipe = r.pipeline(transaction=False)
@@ -301,6 +304,7 @@ def listen_loop(
             op = payload.get("op")
             pk_col = payload.get("pk_col")
             pk_val = payload.get("pk_val")
+            pg_emit_ms = payload.get("pg_emit_ms")
             jobs = jobs_by_table.get(table, [])
             if not jobs:
                 continue
@@ -318,7 +322,11 @@ def listen_loop(
                 continue
             for job in jobs:
                 apply_outputs(r, job.outputs, row, op=op)
-            stats.bump()
+            if isinstance(pg_emit_ms, int):
+                lag_ms = max(0, int(time.time() * 1000) - pg_emit_ms)
+            else:
+                lag_ms = 0
+            stats.bump(lag_ms)
 
 
 def heartbeat_loop(r: redis.Redis, stats: Stats, stop: threading.Event) -> None:

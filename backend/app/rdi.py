@@ -1,13 +1,12 @@
 """RDI status endpoint.
 
 Reads the heartbeat doc written by the RDI processor at `rdi:status` and
-returns a lag metric the UI side panel can render.
+returns the last observed Postgres→Redis replication lag for the UI panel.
 """
 from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timezone
 
 import redis
 from fastapi import APIRouter
@@ -15,15 +14,6 @@ from fastapi import APIRouter
 router = APIRouter(prefix="/rdi", tags=["rdi"])
 
 HEARTBEAT_KEY = "rdi:status"
-
-
-def _parse_iso(value: str | None) -> datetime | None:
-    if not value:
-        return None
-    try:
-        return datetime.fromisoformat(value)
-    except ValueError:
-        return None
 
 
 def _read_status() -> dict | None:
@@ -39,10 +29,12 @@ def _read_status() -> dict | None:
 
 @router.get("/status")
 def rdi_status() -> dict:
-    """Return current RDI sync lag.
+    """Return last observed replication lag.
 
-    Lag = now - max(last_event_at, last_heartbeat_at).
-    A null lag means the processor has never reported in.
+    ``lag_ms`` is the measured Postgres→Redis write delay reported by the
+    processor on its most recent CDC event. ``None`` when the processor has
+    not yet reported one (e.g. fresh stack, or older processor without the
+    field) — the UI renders that as "Idle · caught up".
     """
     try:
         doc = _read_status()
@@ -51,13 +43,12 @@ def rdi_status() -> dict:
     if not doc:
         return {"ok": False, "error": "no heartbeat"}
 
-    now = datetime.now(timezone.utc)
-    last_event = _parse_iso(doc.get("last_event_at"))
-    last_heartbeat = _parse_iso(doc.get("last_heartbeat_at"))
-    reference = last_event or last_heartbeat
-    lag_seconds = (now - reference).total_seconds() if reference else None
+    raw_lag = doc.get("last_lag_ms")
+    lag_ms = int(raw_lag) if isinstance(raw_lag, (int, float)) else None
+    lag_seconds = lag_ms / 1000.0 if lag_ms is not None else None
     return {
         "ok": True,
+        "lag_ms": lag_ms,
         "lag_seconds": lag_seconds,
         "events_total": doc.get("events_total"),
         "last_event_at": doc.get("last_event_at"),
