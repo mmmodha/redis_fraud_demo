@@ -36,10 +36,19 @@ async function forward(req: NextRequest, segments: string): Promise<Response> {
   const method = req.method.toUpperCase();
 
   const headers: Record<string, string> = {};
-  const ct = req.headers.get("content-type");
-  if (ct) headers["content-type"] = ct;
-  const accept = req.headers.get("accept");
-  if (accept) headers["accept"] = accept;
+  // Explicit allowlist — never blanket-forward request headers (avoids
+  // leaking cookies/host/etc). Add headers here as the API needs them.
+  const FORWARD_HEADERS = [
+    "content-type",
+    "accept",
+    "x-bypass-cache",
+    "authorization",
+    "x-request-id",
+  ];
+  for (const name of FORWARD_HEADERS) {
+    const v = req.headers.get(name);
+    if (v) headers[name] = v;
+  }
 
   let body: ArrayBuffer | undefined;
   if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {

@@ -1,0 +1,17 @@
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+redis==5.2.1
+psycopg[binary]==3.2.3
+# Redis Context Retriever SDK. Same package the ctxctl CLI ships in.
+# (Was published as "context-surfaces" before the rename; that name is now
+# a compat shim that installs this one.)
+redis-context-retriever==0.0.5
+# Pydantic comes in transitively via FastAPI; pinned to a v2 minor so the
+# frozen schema models in app.schemas don't drift.
+pydantic>=2.7,<3
+# Naive-RAG embedding model (all-MiniLM-L6-v2). Pulls torch as a dependency;
+# acceptable for the demo image (the backend Docker image already runs python:3.12-slim).
+sentence-transformers>=3.0,<4
+numpy>=1.26,<3
+# Claude tool-use agent (Wave 3b). AsyncAnthropic + messages.create with tools.
+anthropic>=0.40,<1

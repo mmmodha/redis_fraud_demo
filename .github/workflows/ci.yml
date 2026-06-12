@@ -1,0 +1,93 @@
+# Fraud Command Center CI.
+#
+# Guards the colleague onboarding path: a fresh clone + `cp .env.example .env`
+# must boot the full stack via `make demo`, pass `make demo-verify`, and tear
+# down cleanly via `make demo-reset`. A separate gitleaks job audits the
+# working tree and full git history on every PR.
+#
+# This workflow NEVER reads, prints, or commits raw secret values. The dry
+# run uses the zero-config defaults shipped in .env.example only.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Keep only the latest run per branch / PR — older queued runs cancel.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  demo-lifecycle:
+    name: make demo → verify → reset (clean checkout)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        # Enables the buildx cache backend used by the build step below.
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ hashFiles('backend/Dockerfile', 'frontend/Dockerfile', 'infra/**/Dockerfile', 'infra/docker-compose.yml', 'backend/requirements.txt', 'frontend/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Seed .env from .env.example (zero-config defaults)
+        # `make demo` refuses to run without .env. The zero-config example
+        # leaves REDIS_URL + ANTHROPIC_API_KEY blank → bundled redis-stack
+        # + MockClaudeClient. No real secrets are needed in CI.
+        run: cp .env.example .env
+
+      - name: make demo (build + up + seed + smoke)
+        run: make demo
+
+      - name: make demo-verify (4-hero curl + Playwright sanity)
+        run: make demo-verify
+
+      - name: Dump compose state on failure
+        if: failure()
+        # Best-effort diagnostics. `|| true` so a failed dump never masks
+        # the underlying failure exit code.
+        run: |
+          docker compose -f infra/docker-compose.yml --env-file .env ps || true
+          docker compose -f infra/docker-compose.yml --env-file .env logs --tail=200 || true
+
+      - name: make demo-reset (teardown — always runs)
+        if: always()
+        run: make demo-reset
+
+  secrets-audit:
+    name: Secrets audit (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout (full history for gitleaks)
+        uses: actions/checkout@v4
+        with:
+          # gitleaks needs the full history so the `--log-opts=--all` scan
+          # in scripts/audit.sh can walk every commit.
+          fetch-depth: 0
+
+      - name: Run scripts/audit.sh (gitleaks via Docker)
+        # The script exits 1 on any finding, which fails the job. It deletes
+        # the raw JSON reports after producing a redacted summary, so no
+        # secret values land in build logs or artifacts.
+        run: bash scripts/audit.sh
+
+      - name: Upload redacted audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-redacted-report
+          path: .audit/audit-report.txt
+          if-no-files-found: ignore
+          retention-days: 14

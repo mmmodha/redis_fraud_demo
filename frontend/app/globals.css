@@ -1,0 +1,75 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Redis dark command-center tokens (dark mode locked). */
+  --redis-hyper: #FF4438;
+  --redis-deep-hyper: #EB352A;
+  --redis-text-primary: #F0F4F5;
+  --redis-text-secondary: #C8D1D5;
+  --redis-text-link: #8AB4C7;
+  --redis-text-muted: #5A6A72;
+  --redis-bg-primary: #0A1A23;
+  --redis-bg-secondary: #122A35;
+  --redis-bg-tertiary: #1C3A47;
+  --redis-border-primary: #2D4754;
+  --redis-border-secondary: #3D5764;
+}
+
+html, body {
+  background-color: var(--redis-bg-primary);
+  color: var(--redis-text-primary);
+  font-family: 'Space Grotesk', sans-serif;
+}
+
+code, pre, .font-mono {
+  font-family: 'Space Mono', monospace;
+}
+
+/* Scrollbar (dark) */
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb {
+  background: var(--redis-border-primary);
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-track { background: transparent; }
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(31, 179, 107, 0.45); }
+  50% { opacity: 0.85; box-shadow: 0 0 0 6px rgba(31, 179, 107, 0); }
+}
+.live-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+@keyframes fade-step {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.trace-step-enter {
+  animation: fade-step 240ms ease-out both;
+}
+
+/* Verdict chip reveal — Wave 7f+ quiz-mode card. Slides up + scales in so
+   the verdict lands punchy after the audience has committed to a guess. */
+@keyframes verdict-reveal {
+  from { opacity: 0; transform: translateY(8px) scale(0.85); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.verdict-reveal {
+  animation: verdict-reveal 250ms ease-out both;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(200, 209, 213, 0.18) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}

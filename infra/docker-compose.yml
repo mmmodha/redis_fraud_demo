@@ -1,9 +1,26 @@
 # Fraud Command Center demo stack.
 #
-# Redis Cloud is the ONLY Redis runtime — there is no local Redis service.
-# Both the backend and RDI connect to the URL provided in REDIS_URL.
+# Default (zero-config) wiring uses the bundled `redis-stack` service —
+# activated via the `local-redis` profile when REDIS_URL is empty in .env.
+# Presenter wiring (REDIS_URL points at Redis Cloud) skips the profile and
+# every service connects to the managed database instead.
 
 services:
+
+  redis-stack:
+    image: redis/redis-stack-server:latest
+    container_name: fcc-redis-stack
+    profiles: ["local-redis"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_stack_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
 
   postgres:
     image: postgres:16-alpine
@@ -74,6 +91,10 @@ services:
       CTX_ADMIN_KEY: ${CTX_ADMIN_KEY:-}
     ports:
       - "8000:8000"
+    # Mount the policy corpus so the seeder can call build_index() inside
+    # this container — keeps sentence-transformers off the seeder image.
+    volumes:
+      - ../data/policies:/policies:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -118,5 +139,55 @@ services:
       retries: 20
       start_period: 10s
 
+  # One-shot synthetic seeder. Lives in the `seed` profile so it never
+  # starts under `compose up`; `scripts/seed.sh` invokes it with
+  # `compose run --rm seeder ...`. Idempotent.
+  seeder:
+    build:
+      context: ..
+      dockerfile: infra/seeder/Dockerfile
+    container_name: fcc-seeder
+    profiles: ["seed"]
+    environment:
+      REDIS_URL: ${REDIS_URL}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB:-bank}
+      POSTGRES_USER: ${POSTGRES_USER:-bank}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-bank}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  # Playwright sanity runner. Lives in the `verify` profile so it stays
+  # out of `compose up`; `scripts/demo-verify.sh` invokes it via
+  # `compose run --rm verifier`. The official Playwright image ships the
+  # browsers pre-installed so the host needs no Node / Chromium.
+  verifier:
+    image: mcr.microsoft.com/playwright:v1.60.0-noble
+    container_name: fcc-verifier
+    profiles: ["verify"]
+    working_dir: /work
+    volumes:
+      - ../frontend:/work
+      - verifier_node_modules:/work/node_modules
+    environment:
+      PLAYWRIGHT_BASE_URL: http://frontend:3000
+      NEXT_PUBLIC_BACKEND_URL: http://backend:8000
+      CI: "1"
+    depends_on:
+      frontend:
+        condition: service_healthy
+    command:
+      - bash
+      - -lc
+      - >-
+        npm install --no-audit --no-fund --silent
+        && npx playwright test tests/hero-scenarios.spec.ts
+        --grep mike --reporter=line
+
 volumes:
   postgres_data:
+  redis_stack_data:
+  verifier_node_modules:

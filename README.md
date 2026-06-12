@@ -2,139 +2,190 @@
 
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)
 ![FastAPI](https://img.shields.io/badge/FastAPI-Python%203.12-009688?logo=fastapi)
-![Redis IRIS](https://img.shields.io/badge/Redis-IRIS-DC382D?logo=redis)
+![Redis](https://img.shields.io/badge/Redis-IRIS-DC382D?logo=redis)
 ![Anthropic Claude](https://img.shields.io/badge/Anthropic-Claude%20Sonnet-D97757?logo=anthropic)
+![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 
-A narrative, sub-second fraud-detection demo. A Claude-powered agent uses
-**Redis IRIS** (RDI, Feature Store, Context Retriever, Agent Memory) to
-walk the line between blocking real fraud and not frustrating legitimate
-customers — three hero customers, one dashboard, four live IRIS panels,
-all under a second per decision.
+A narrative, sub-second fraud-detection demo: a Claude-powered agent
+uses **Redis IRIS** (RDI, Feature Store, Context Retriever, Agent
+Memory) to approve or block card transactions while you watch. It is
+aimed at banking architects and AI teams who want to see the four IRIS
+surfaces working together in one running stack, not a slide deck.
+Audiences see three hero customers — one auto-approved, one
+near-miss recovered by context, one blocked — each decision rendered
+live alongside the Redis keys, vector searches, and tool calls that
+produced it.
 
-![Command Center](docs/screenshots/command-center.png)
+## Hero moments
+
+| Mike — auto-approve | Jane — near-miss recovered | Alex — fraud blocked |
+| ------------------- | -------------------------- | -------------------- |
+| ![Mike auto-approve](docs/screenshots/hero-mike.png) | ![Jane review](docs/screenshots/hero-jane.png) | ![Alex blocked](docs/screenshots/hero-alex.png) |
+| Feature Store answers in ~50 ms; no human, no LLM. | Agent Memory + Context Retriever flip a "block" into an "approve" in <1 s. | High-risk features + policy match → block, with the Redis evidence trail. |
+
+The full dashboard, with all four IRIS panels visible, is in
+[`docs/screenshots/command-center.png`](docs/screenshots/command-center.png).
 
 ---
 
-## Run the demo in 5 minutes
+## What you need
+
+**For the bundled demo: a Docker engine. Nothing else. No accounts, no
+API keys, no managed services.**
+
+| Bundled (default) | What it gives you |
+| ----------------- | ----------------- |
+| Docker Desktop / Docker Engine + Compose v2 | The entire host-tooling list. |
+| `redis-stack` container (auto-started)      | Redis with RediSearch + RedisJSON, locally. |
+| Mock-Claude (auto-selected)                 | Canned per-hero SSE traces with realistic latency — no Anthropic key. |
+| Synthetic Postgres + RDI-emulator           | Seeded automatically; no external DB. |
+
+| Opt-in (presenter / on-stage) | When to use it |
+| ----------------------------- | -------------- |
+| **Redis Cloud** (`REDIS_URL`) | Show the live IRIS surfaces in the Redis Cloud console alongside the demo UI. |
+| **Anthropic API key** (`ANTHROPIC_API_KEY`) | Real Claude Sonnet tool-use instead of the canned trace. |
+| **Context Retriever admin key** (`CTX_ADMIN_KEY`) | Provision the managed Context Retriever surface for the on-stage path. |
+
+Toggling between bundled and opt-in is one env var at a time. See
+[Architecture](#architecture) for where each toggle takes effect.
+
+---
+
+## Quick start (5 steps)
 
 ```bash
-# 1. Clone and enter the repo
+# 1. Clone
 git clone <repo-url> fraud-command-center && cd fraud-command-center
 
-# 2. Configure your Redis Cloud + Anthropic credentials
+# 2. Create your .env — leave every value blank for the zero-account demo
 cp .env.example .env
-$EDITOR .env          # fill in REDIS_URL and ANTHROPIC_API_KEY
 
-# 3. Bring up the stack and open the UI
-make demo             # builds, waits for backend health, opens http://localhost:3000
+# 3. Build, start, seed, open the UI
+make demo
+
+# 4. Open the URL the previous step printed (also auto-opens on macOS / Linux)
+#    http://localhost:3000
+
+# 5. Click any of the three hero customer cards on the dashboard.
 ```
 
-First time only, after `make demo`:
+That's it. `make demo` is idempotent — rerun it any time to bring the
+stack back to a clean, seeded state.
 
-```bash
-make seed             # populate Postgres → RDI mirrors into Redis
-make context-up       # bootstrap the Context Retriever surface in Redis Cloud
-make policy-index     # build the policy RAG index in Redis
-```
+To go from the bundled path to the on-stage path, fill in `REDIS_URL`,
+`ANTHROPIC_API_KEY`, and (optionally) `CTX_ADMIN_KEY` in `.env`, then
+run `make demo` again. Every variable is documented inline in
+[`.env.example`](.env.example) with its "blank fallback" behaviour.
 
-See [`docs/runbook.md`](docs/runbook.md) for the on-stage walkthrough
-and [`docs/context-retriever-setup.md`](docs/context-retriever-setup.md)
-for Context Retriever provisioning.
+---
+
+## Run-of-show
+
+**Open with the dashboard.** Three hero cards sit side-by-side: Mike
+(green — all clear), Jane (amber — needs sub-second review), Alex
+(red — blocked). A live transaction feed scrolls beneath them. The
+shape of the screen tells the story before anyone says a word.
+
+**Click each hero in turn.** Each click drops into a single customer
+view with four IRIS panels (RDI lag, Feature Store keys, Context
+Retriever tool calls, Agent Memory) updating in real time as the
+verdict streams in. The panels are not decorations — they are the
+actual Redis reads and tool calls that produced the verdict.
+
+**Close with the chatbot.** A side-by-side comparison sends every
+prompt through both *naive RAG* (policy docs only) and *Context
+Surface* (policy docs + live IRIS context). Same Claude model. Same
+policy corpus. Different context. The answers diverge on screen.
+
+The minute-by-minute presenter script is in
+[`docs/runbook.md`](docs/runbook.md); quotable lines for the webinar
+are in [`docs/talking-points.md`](docs/talking-points.md).
+
+---
+
+## Troubleshooting top 5
+
+1. **Port 3000 / 5432 / 6379 / 8000 already in use.** Stop whatever is
+   on the host port (often a previous `make demo` half-running, or a
+   local Postgres) and rerun `make demo`. `make down` cleans up the
+   stack; `make demo-reset` also deletes volumes.
+
+2. **Docker memory too low.** The stack needs ~4 GB free. On Docker
+   Desktop: Settings → Resources → Memory ≥ 6 GB, then Apply &
+   Restart. Symptom is the backend container OOM-killing during seed.
+
+3. **First build is slow (5–8 minutes).** Expected. Subsequent builds
+   are cached and finish in under a minute. If a wheel build hangs,
+   rerun `make build` — Docker resumes from the last successful layer.
+
+4. **Variables in `.env` look fine but nothing connects.** `.env`
+   parsing is strict: no spaces around `=`, no inline comments on the
+   value line, no quotes unless they are part of the value. Run
+   `make demo` and watch the first few lines — it prints the resolved
+   `Redis mode` and `Agent mode` so you can spot a typo immediately.
+
+5. **"Why is the Claude trace identical every time?"** You are in
+   mock-Claude mode (the zero-account default). Set
+   `ANTHROPIC_API_KEY` in `.env` and rerun `make demo` for the real
+   Sonnet tool-use trace. The on-screen "Agent mode" badge in the UI
+   tells you which mode is live.
 
 ---
 
 ## Architecture
 
+📐 Editable diagram: [`docs/architecture.excalidraw`](docs/architecture.excalidraw) — open in [excalidraw.com](https://excalidraw.com/).
+
 ```
 Postgres (synthetic core banking)
-  └── RDI ──► Redis Cloud
-                ├── Feature Store         (Hash / JSON per customer + card)
-                ├── Context Retriever     (managed entities + MCP-style tools)
-                ├── Agent Memory          (JSON doc per customer)
-                └── Policy/Study Index    (RediSearch vector index;
-                                           shared by BOTH RAG and IRIS pipelines)
-                        ▲
-                        │
-        FastAPI backend (Python) ◄── Anthropic Claude
-          ├── /decide   (fraud agent — IRIS only)
-          └── /chat     (runs RAG + IRIS in parallel for side-by-side)
-                        ▲
-                        │
-              Next.js demo UI (React)
+  └── RDI-emulator ──► Redis (bundled redis-stack OR Redis Cloud)
+                         ├── Feature Store      (Hash / JSON per customer + card)
+                         ├── Context Retriever  (managed entities + MCP-style tools)
+                         ├── Agent Memory       (JSON doc per customer)
+                         └── Policy / Study Index (RediSearch vector)
+                                  ▲
+                                  │
+                  FastAPI backend ◄── Claude  (real Sonnet  ──or──  mock SSE trace)
+                          ▲                       ▲                    ▲
+                          │                       │                    │
+                  Next.js demo UI         ANTHROPIC_API_KEY      AGENT_MODE=mock
+                                          (real path)            (bundled default)
 ```
 
-The chatbot at the bottom of the dashboard sends every prompt through
-**both** pipelines — naive RAG (policy docs only) and Context Surface
-(policy docs + live IRIS context) — so the audience watches the LLM
-answer change in real time. **Same model. Same policy docs. Different
-context.**
+The two **mock-vs-real toggle points** are:
 
-![Chatbot comparison](docs/screenshots/chatbot-comparison.png)
+- `REDIS_URL` — blank → bundled `redis-stack` container; set → Redis
+  Cloud. Same RDI-emulator output, same key shapes, same code path.
+- `AGENT_MODE` (auto-resolved from `ANTHROPIC_API_KEY`) — blank +
+  no key → `mock`; key present → `claude`; explicit `stub` for the
+  deterministic test harness. The UI badge labels which one is live.
 
----
-
-## Redis Cloud setup (required)
-
-This demo uses **Redis Cloud as the only Redis runtime** — there is no
-local Redis service in `docker compose`. Before running `make demo`:
-
-1. Create a free Redis Cloud database at <https://app.redislabs.com>
-   (enable RediSearch + RedisJSON modules).
-2. Copy `.env.example` to `.env`.
-3. Paste your database's connection string into `REDIS_URL`
-   (format: `redis://default:<password>@<host>:<port>` or
-   `rediss://...` for TLS).
-4. Set `ANTHROPIC_API_KEY` to your Anthropic key.
-5. Run `make demo`.
-
-For offline rehearsal (no Anthropic key available), set
-`AGENT_MODE=stub` in `.env` — verdicts are deterministic and match the
-live demo.
+The editable diagram is [`docs/architecture.excalidraw`](docs/architecture.excalidraw)
+(open in [excalidraw.com](https://excalidraw.com) → File → Open).
 
 ---
 
-## Repo layout
+## RDI-emulator honesty note
 
-| Path        | Purpose                                          |
-| ----------- | ------------------------------------------------ |
-| `backend/`  | FastAPI service (Claude agent, feature reads).   |
-| `frontend/` | Next.js Fraud Command Center UI.                 |
-| `data/`     | Synthetic banking seed scripts + SQL.            |
-| `infra/`    | Docker Compose stack and RDI pipeline config.    |
-| `docs/`     | Demo runbook, presenter notes, screenshots.      |
-| `scripts/`  | Bootstrap, indexing, and screenshot capture.     |
-
-## Make targets
-
-| Target              | What it does                                          |
-| ------------------- | ----------------------------------------------------- |
-| `make demo`         | Build + start the stack, wait for health, open the UI.|
-| `make seed`         | Seed Postgres with the synthetic banking data.        |
-| `make seed-memory`  | Seed Agent Memory fixtures (Jane's travel window).    |
-| `make context-up`   | Provision the Context Retriever surface (one-shot).   |
-| `make policy-index` | Rebuild the RediSearch policy index `idx:policies`.   |
-| `make rdi-status`   | Show current RDI sync lag (Postgres → Redis).         |
-| `make ui-test`      | Run the Playwright smoke + screenshot suites.         |
-| `make logs`         | Tail all service logs.                                |
-| `make down`         | Stop and remove the stack (and Postgres volume).      |
-
-## Capturing fresh screenshots
-
-```bash
-./scripts/capture-screenshots.sh   # re-runs the Playwright capture flow
-```
-
-Outputs land in `docs/screenshots/` and are embedded by both this README
-and the presenter runbook.
+The `rdi` service in `infra/docker-compose.yml` is an **in-repo
+emulator** of the managed Redis Data Integration product, not the
+real RDI Helm chart. It runs a small Python processor
+(`infra/rdi/processor.py`) that listens on Postgres logical
+replication and writes the same canonical Redis keys (`customer:*`,
+`card:*`, `tx:*`, `stream:transactions`, …) the managed product
+would, using the same RDI-shaped YAML config under `infra/rdi/config/`.
+This keeps the demo self-contained and a single `make demo` away from
+working, but it is **not** a substitute for the production RDI
+deployment story — the real product handles connectors, scaling, and
+operational concerns the emulator deliberately skips.
 
 ---
 
-## Presenter resources
+## License
 
-- [`docs/runbook.md`](docs/runbook.md) — minute-by-minute stage script.
-- [`docs/talking-points.md`](docs/talking-points.md) — 10 quotable lines
-  for the webinar.
-- [`docs/context-retriever-setup.md`](docs/context-retriever-setup.md) —
-  Context Retriever bootstrap walkthrough.
-- [`docs/agent-memory.md`](docs/agent-memory.md) — Agent Memory schema
-  and seeded fixtures.
+Released under the Apache License, Version 2.0. See [`LICENSE`](LICENSE)
+for the full text.
+
+Contributions, bug reports, and PRs welcome — see
+[`CONTRIBUTING.md`](CONTRIBUTING.md) for dev setup, test commands, and
+the commit-message convention.

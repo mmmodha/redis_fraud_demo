@@ -29,14 +29,24 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Environment
+# Environment / secrets — keep ALL real env files out of git.
+# The negation lets `.env.example` (the committed template) through.
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+*.pem
+*.key
 
 # Logs
 *.log
 npm-debug.log*
+
+# Test artifacts
+playwright-report/
+test-results/
+
+# Secrets audit output (raw gitleaks reports may contain secret values).
+.audit/
 
 .venv-test/
 .venv-verify/
