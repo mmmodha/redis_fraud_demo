@@ -72,10 +72,50 @@ make demo
 That's it. `make demo` is idempotent — rerun it any time to bring the
 stack back to a clean, seeded state.
 
+> **You do not need to generate or build the data yourself.** Postgres
+> starts empty; `make demo` runs a one-shot `seeder` container that
+> populates Postgres, then RDI streams it into Redis. The synthetic
+> bank, the three hero customers, the 10k transactions, and the agent
+> memory are all created end-to-end by `make demo`. There is no
+> separate "generate data" step to run.
+
 To go from the bundled path to the on-stage path, fill in `REDIS_URL`,
 `ANTHROPIC_API_KEY`, and (optionally) `CTX_ADMIN_KEY` in `.env`, then
 run `make demo` again. Every variable is documented inline in
 [`.env.example`](.env.example) with its "blank fallback" behaviour.
+
+### What `make demo` does
+
+`make demo` is a single script that walks the stack from empty to
+demo-ready. The data-generation steps are 3–5:
+
+1. **Build** — `docker compose build` for `backend`, `frontend`,
+   `seeder`, `rdi`, `context-retriever`.
+2. **Start** — bring up `postgres`, `redis-stack` (if `REDIS_URL`
+   blank), `backend`, `frontend`, `rdi`. Postgres boots empty:
+   `infra/postgres/init.sql` is an intentional placeholder.
+3. **Seed Postgres** — `compose run --rm seeder python -m data.seed`
+   applies `data/schema.sql` and generates the synthetic core-banking
+   data: customers (incl. heroes Mike / Jane / Alex), accounts, cards,
+   devices, merchants, MCCs, and ~10k transactions
+   (`data/seed.py`, `data/heroes.py`, `data/traffic.py`).
+4. **Stream into Redis** — the `rdi` service tails Postgres logical
+   replication and writes the canonical Redis keys
+   (`customer:*`, `card:*`, `tx:*`, `stream:transactions`, …) per
+   `infra/rdi/config/`. No manual step; it runs continuously.
+5. **Seed Redis-only state** —
+   `compose run --rm seeder python -m data.seed_memory` adds the
+   Agent Memory JSON, disputes, and pending-review rows (these don't
+   originate in Postgres). Then `scripts/policy-index.sh` builds the
+   RediSearch `idx:policies` vector index from `data/policies/`.
+6. **Verify + print URLs** — health-checks the backend and opens
+   `http://localhost:3000`.
+
+Every step is idempotent — rerunning `make demo` re-seeds cleanly.
+`make demo-reset` additionally deletes named volumes for a true
+from-scratch run. The seed pipeline lives in
+[`scripts/seed.sh`](scripts/seed.sh); the synthetic generator lives in
+the [`data/`](data/) package.
 
 ---
 
