@@ -274,23 +274,54 @@ check_cpu() {
 
 # --- Ports -----------------------------------------------------------------
 
-# port_in_use <port> -> 0 if a LISTEN socket is found, 1 otherwise.
-port_in_use() {
+# Probe selected once on first port check. Values: lsof | ss | none.
+PORT_PROBE=""
+
+detect_port_probe() {
+  if [ -n "${PORT_PROBE}" ]; then
+    return
+  fi
+  if command -v lsof >/dev/null 2>&1; then
+    PORT_PROBE="lsof"
+  elif command -v ss >/dev/null 2>&1; then
+    PORT_PROBE="ss"
+  else
+    PORT_PROBE="none"
+    warn "ports" "neither lsof nor ss available — skipping port checks"
+  fi
+}
+
+port_in_use_lsof() {
   lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1
+}
+
+port_in_use_ss() {
+  ss -tln "sport = :$1" 2>/dev/null | grep -q LISTEN
 }
 
 check_port() {
   port="$1"
   label="$2"
-  if ! command -v lsof >/dev/null 2>&1; then
-    warn "port ${port}" "lsof not installed — skipping ${label} check"
-    return
-  fi
-  if port_in_use "${port}"; then
-    warn "port ${port}" "in use (${label}) — stop the conflicting service or change the port"
-  else
-    pass "port ${port}" "free (${label})"
-  fi
+  detect_port_probe
+  case "${PORT_PROBE}" in
+    lsof)
+      if port_in_use_lsof "${port}"; then
+        warn "port ${port}" "in use (${label}) — stop the conflicting service or change the port"
+      else
+        pass "port ${port}" "free (${label})"
+      fi
+      ;;
+    ss)
+      if port_in_use_ss "${port}"; then
+        warn "port ${port}" "in use (${label}) — stop the conflicting service or change the port"
+      else
+        pass "port ${port}" "free (${label})"
+      fi
+      ;;
+    *)
+      warn "port ${port}" "skipping ${label} check (no probe available)"
+      ;;
+  esac
 }
 
 # --- Run all checks --------------------------------------------------------
