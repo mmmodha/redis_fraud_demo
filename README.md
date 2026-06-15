@@ -79,16 +79,24 @@ for the full walkthrough.
 
 ---
 
-## Quick start (5 steps)
+## Quick start (6 steps)
 
 ```bash
+# 0. Preflight — verifies docker/make/git/curl + 5 GB free disk + 4 GB RAM
+#    + the four host ports the demo uses. Works on a bare VM with only
+#    bash installed. Exits non-zero if anything is missing, with a
+#    one-line install hint per item. `make doctor` is the same thing if
+#    you already have make.
+bash scripts/doctor.sh
+
 # 1. Clone
 git clone <repo-url> fraud-command-center && cd fraud-command-center
 
 # 2. Create your .env — leave every value blank for the zero-account demo
 cp .env.example .env
 
-# 3. Build, start, seed, open the UI
+# 3. Build, start, seed, open the UI (re-runs doctor first; bypass with
+#    SKIP_DOCTOR=1 make demo)
 make demo
 
 # 4. Open the URL the previous step printed (also auto-opens on macOS / Linux)
@@ -197,6 +205,13 @@ are in [`docs/talking-points.md`](docs/talking-points.md).
    `ANTHROPIC_API_KEY` in `.env` and rerun `make demo` for the real
    Sonnet tool-use trace. The on-screen "Agent mode" badge in the UI
    tells you which mode is live.
+
+6. **Doctor preflight blocking `make demo`?** `make demo` runs
+   `bash scripts/doctor.sh` first and aborts if anything required is
+   missing. To bypass (e.g. you know lsof is unavailable in CI, or you
+   want to test a half-broken setup), prefix with `SKIP_DOCTOR=1`:
+   `SKIP_DOCTOR=1 make demo`. The doctor itself never auto-installs
+   anything — it only prints one-line install hints per missing item.
 
 ---
 

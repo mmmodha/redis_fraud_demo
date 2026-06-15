@@ -1,6 +1,6 @@
 COMPOSE := docker compose -f infra/docker-compose.yml --env-file .env
 
-.PHONY: demo demo-reset demo-verify seed seed-memory down logs ps build \
+.PHONY: demo demo-reset demo-verify doctor seed seed-memory down logs ps build \
         test rdi-status context-up ui ui-test ui-test-headed policy-index
 
 # ---- One-shot demo lifecycle ---------------------------------------------
@@ -16,6 +16,11 @@ demo-reset: .env
 
 demo-verify: .env
 	@bash scripts/demo-verify.sh
+
+# Preflight: verifies tools + resources + ports before `make demo`.
+# `make demo` invokes this automatically (skip with SKIP_DOCTOR=1).
+doctor:
+	@bash scripts/doctor.sh
 
 # ---- Individual operations (mostly delegated to scripts) -----------------
 

@@ -9,6 +9,22 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=./_lib.sh
 . "${SCRIPT_DIR}/_lib.sh"
 
+# Preflight: tools / resources / ports. Skip with SKIP_DOCTOR=1 if you
+# know what you're doing (e.g. running inside CI where lsof is missing).
+if [[ "${SKIP_DOCTOR:-0}" != "1" ]]; then
+  # `set -e` would abort here on non-zero; run inside a guarded block so
+  # we can surface a clearer error and forward doctor's exit code.
+  set +e
+  bash "${SCRIPT_DIR}/doctor.sh"
+  doctor_rc=$?
+  set -e
+  if [[ ${doctor_rc} -ne 0 ]]; then
+    echo "ERROR: preflight (scripts/doctor.sh) failed. Fix the items above," >&2
+    echo "       or set SKIP_DOCTOR=1 to bypass." >&2
+    exit "${doctor_rc}"
+  fi
+fi
+
 configure_redis_mode
 
 echo "Redis mode : ${REDIS_MODE}  (bundled redis-stack | external REDIS_URL)"
