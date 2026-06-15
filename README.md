@@ -82,27 +82,27 @@ for the full walkthrough.
 ## Quick start (6 steps)
 
 ```bash
-# 0. Preflight — verifies docker/make/git/curl + 5 GB free disk + 4 GB RAM
+# 1. Clone
+git clone <repo-url> fraud-command-center && cd fraud-command-center
+
+# 2. Preflight — verifies docker/make/git/curl + 5 GB free disk + 4 GB RAM
 #    + the four host ports the demo uses. Works on a bare VM with only
 #    bash installed. Exits non-zero if anything is missing, with a
 #    one-line install hint per item. `make doctor` is the same thing if
 #    you already have make.
 bash scripts/doctor.sh
 
-# 1. Clone
-git clone <repo-url> fraud-command-center && cd fraud-command-center
-
-# 2. Create your .env — leave every value blank for the zero-account demo
+# 3. Create your .env — leave every value blank for the zero-account demo
 cp .env.example .env
 
-# 3. Build, start, seed, open the UI (re-runs doctor first; bypass with
+# 4. Build, start, seed, open the UI (re-runs doctor first; bypass with
 #    SKIP_DOCTOR=1 make demo)
 make demo
 
-# 4. Open the URL the previous step printed (also auto-opens on macOS / Linux)
+# 5. Open the URL the previous step printed (also auto-opens on macOS / Linux)
 #    http://localhost:3000
 
-# 5. Click any of the three hero customer cards on the dashboard.
+# 6. Click any of the three hero customer cards on the dashboard.
 ```
 
 That's it. `make demo` is idempotent — rerun it any time to bring the
