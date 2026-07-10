@@ -91,7 +91,7 @@ the demo after every backend rebuild.
 ## The three beats (≈3 min each)
 
 The dashboard puts all three customers side-by-side. Each card now
-runs as a **quiz**: bio + in-flight scenario only — no verdict spoiler
+runs as a **gut-check**: bio + in-flight scenario only — no verdict spoiler
 until you hit **Run scenario**. The card animates the verdict chip in
 ~250 ms (fast path), then the LLM-narrated reason fills in afterward.
 
@@ -247,6 +247,58 @@ Right rail close-up — show this if the audience asks "which Redis
 layer does what":
 
 ![IRIS panels detail](screenshots/iris-panels-detail.png)
+
+---
+
+## Guide mode (in-app navigation)
+
+Toggle **Guide mode** in the top bar for a paced, educational walkthrough. The side
+panel explains what Redis is doing at each step — use **Continue** to move at your
+own speed through read-only beats.
+
+### Flow
+
+1. **Welcome** → **Meet Mike** (Mike auto-selected)
+2. **Mike** — verdict, trace, analyst summary, Feature Store, Context Retriever
+3. **Jane** — near-miss, travel memory, chatbot (preset + LangCache), verdict cache replay
+4. **Alex** — fraud blocked using Feature Store + Context Retriever data points
+5. **Sarah** — step-up auth (OTP), memory + features
+6. **Recap** — business summary of Redis value for any LLM, then **Finish tour**
+
+Guide copy is LLM-agnostic: the point is Redis data improves accuracy and cost for
+whatever model the bank uses. Each step includes a **Why Redis** callout in plain
+business language. On capability steps, the guide panel also shows the same animated
+**How it works** diagrams from the top-bar **How IRIS works** tab (Context Retriever,
+Agent Memory, LangCache, RDI).
+
+Guide mode persists in `localStorage` across refreshes.
+
+---
+
+## LangCache token savings (chatbot)
+
+After the four preset chat prompts on Jane, click **"Any upcoming travel?"**
+again. The UI shows:
+
+- A green **LangCache HIT** banner with tokens saved
+- A before/after **savings bar** comparing LLM token burn vs cache
+- A running **session counter** in the chatbot header
+
+First ask = MISS (baseline token row). Second identical ask = HIT (zero LLM tokens).
+
+**Similar questions (paraphrases):** tune in `.env`:
+
+```dotenv
+LANGCACHE_SIMILARITY_THRESHOLD=0.85   # managed LangCache SDK
+LANGCACHE_SEMANTIC_THRESHOLD=0.85     # local Redis fallback
+```
+
+Lower (e.g. `0.75`) matches more paraphrases; raise (e.g. `0.90`) if you see wrong
+answers cached. Restart backend after changing — no rebuild needed for threshold-only
+changes once the image includes the wiring.
+
+Demo pair on Jane: ask `"Any upcoming travel?"` then `"Do they have travel planned?"`.
+Look for **Semantic match** in the green LangCache banner.
 
 ---
 

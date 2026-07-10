@@ -15,3 +15,5 @@ sentence-transformers>=3.0,<4
 numpy>=1.26,<3
 # Claude tool-use agent (Wave 3b). AsyncAnthropic + messages.create with tools.
 anthropic>=0.40,<1
+# Optional managed LangCache (chat semantic cache on Redis Cloud).
+langcache>=0.9,<1

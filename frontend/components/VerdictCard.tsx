@@ -6,6 +6,7 @@ import type {
   VerdictFastResponse,
 } from "@/lib/types";
 import { Prose } from "@/components/Prose";
+import { LangCacheVerdictSavings } from "@/components/LangCacheTokenSavings";
 
 const TONE = {
   approve: { label: "APPROVE", bg: "bg-verdict-approve", text: "text-verdict-approve", border: "border-verdict-approve/40", glow: "shadow-[0_0_40px_-12px_rgba(31,179,107,0.6)]" },
@@ -54,18 +55,21 @@ export function VerdictCard({
 
   return (
     <div className="space-y-4">
-      <VerdictBlock
-        verdict={verdict}
-        tone={tone}
-        confidencePct={confidencePct}
-        latencyMs={latencyMs}
-        fast={fast}
-        hero={hero}
-        otpState={otpState}
-        otpResult={otpResult}
-        otpLatencyMs={otpLatencyMs}
-        cached={cached}
-      />
+      <div data-guide="verdict-card">
+        <VerdictBlock
+          verdict={verdict}
+          tone={tone}
+          confidencePct={confidencePct}
+          latencyMs={latencyMs}
+          fast={fast}
+          hero={hero}
+          otpState={otpState}
+          otpResult={otpResult}
+          otpLatencyMs={otpLatencyMs}
+          cached={cached}
+          cacheLatencyMs={score?.cache_latency_ms}
+        />
+      </div>
       <AnalystSummaryBlock score={score} />
     </div>
   );
@@ -82,11 +86,12 @@ interface BlockProps {
   otpResult: OtpConfirmResponse | null;
   otpLatencyMs: number;
   cached: boolean;
+  cacheLatencyMs?: number | null;
 }
 
 function VerdictBlock({
   verdict, tone, confidencePct, latencyMs, fast, hero,
-  otpState, otpResult, otpLatencyMs, cached,
+  otpState, otpResult, otpLatencyMs, cached, cacheLatencyMs,
 }: BlockProps) {
   const isReview = verdict === "review";
   return (
@@ -114,6 +119,9 @@ function VerdictBlock({
           latencyMs={latencyMs}
           fast={fast}
         />
+      )}
+      {cached && (
+        <LangCacheVerdictSavings cacheLatencyMs={cacheLatencyMs} tokensSavedEstimate={2480} />
       )}
     </div>
   );
@@ -271,10 +279,11 @@ function ReviewBreadcrumb({
 function AnalystSummaryBlock({ score }: { score: ScoreResponse | null }) {
   const loading = !score;
   const latencySecs = score ? (score.trace.total_latency_ms / 1000).toFixed(1) : null;
-  const llmModel = score?.trace.llm_model ?? "Claude Sonnet 4.5";
+  const llmModel = score?.trace.llm_model ?? "LLM";
   return (
     <div
       data-testid="analyst-summary-card"
+      data-guide="analyst-summary"
       data-loading={loading ? "true" : "false"}
       className="rounded-redis border border-redis-border-secondary bg-redis-bg-tertiary/40 p-6"
     >

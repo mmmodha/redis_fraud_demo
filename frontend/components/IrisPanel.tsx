@@ -9,13 +9,15 @@ interface Props {
   subtitle?: string;
   badge?: string;
   active?: boolean;
+  guideTarget?: string;
   children: ReactNode;
 }
 
-export function IrisPanel({ title, component, subtitle, badge, active, children }: Props) {
+export function IrisPanel({ title, component, subtitle, badge, active, guideTarget, children }: Props) {
   return (
     <section
       data-testid={`iris-panel-${component}`}
+      data-guide={guideTarget}
       data-active={active ? "true" : "false"}
       className={`rounded-redis border bg-redis-bg-secondary p-4 transition-colors duration-200 ${
         active ? "border-redis-hyper" : "border-redis-border"

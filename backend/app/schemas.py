@@ -155,6 +155,15 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
     trace: AgentTrace
+    cached: bool = False
+    cache_latency_ms: Optional[int] = None
+    cache_backend: Optional[Literal["local", "langcache"]] = None
+    cache_match_type: Optional[Literal["exact", "semantic"]] = None
+    cache_similarity: Optional[float] = None
+    input_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
+    tokens_saved_input: Optional[int] = None
+    tokens_saved_output: Optional[int] = None
 
 
 __all__ = [

@@ -57,7 +57,7 @@ rdi-status:
 # In-container test runner — uses the live backend image so deps match
 # what the running stack ships with.
 test:
-	$(COMPOSE) run --rm --no-deps backend \
+	$(COMPOSE) run --rm --no-deps -v $(CURDIR)/tests:/app/tests:ro backend \
 	  sh -c 'pip install --quiet pytest pytest-asyncio && pytest /app/tests -v'
 
 # Provision the Redis Context Retriever surface + agent key. Idempotent.

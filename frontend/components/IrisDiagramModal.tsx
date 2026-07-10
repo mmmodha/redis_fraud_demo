@@ -2,8 +2,9 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import lottie, { type AnimationItem } from "lottie-web";
+import { IRIS_DIAGRAM_PANELS, irisDiagramBySlug, type IrisDiagramSlug } from "@/lib/irisDiagrams";
 
-type PanelSlug = "rdi" | "context-retriever" | "agent-memory" | "langcache";
+type PanelSlug = IrisDiagramSlug;
 
 type Panel = {
   slug: PanelSlug;
@@ -11,28 +12,11 @@ type Panel = {
   subtitle: string;
 };
 
-const PANELS: Panel[] = [
-  {
-    slug: "rdi",
-    title: "Redis Data Integration",
-    subtitle: "Streams Postgres / Kafka changes into Redis in real time",
-  },
-  {
-    slug: "context-retriever",
-    title: "Context Retriever",
-    subtitle: "Pulls fresh customer + transaction context for every decision",
-  },
-  {
-    slug: "agent-memory",
-    title: "Agent Memory",
-    subtitle: "Persists short-term + long-term agent state across turns",
-  },
-  {
-    slug: "langcache",
-    title: "LangCache",
-    subtitle: "Semantic cache for repeated LLM prompts to cut latency and cost",
-  },
-];
+const PANELS: Panel[] = IRIS_DIAGRAM_PANELS.map((p) => ({
+  slug: p.slug,
+  title: p.title,
+  subtitle: p.subtitle,
+}));
 
 export function IrisDiagramModal({
   open,
@@ -75,7 +59,7 @@ export function IrisDiagramModal({
         renderer: "svg",
         loop: true,
         autoplay: true,
-        path: `/iris/${panel.slug}.json`,
+        path: irisDiagramBySlug(panel.slug).lottiePath,
       });
       items.push(item);
     }

@@ -63,6 +63,15 @@ export interface ChatRequest {
 export interface ChatResponse {
   answer: string;
   trace: AgentTrace;
+  cached?: boolean;
+  cache_latency_ms?: number | null;
+  cache_backend?: "local" | "langcache" | null;
+  cache_match_type?: "exact" | "semantic" | null;
+  cache_similarity?: number | null;
+  input_tokens?: number | null;
+  output_tokens?: number | null;
+  tokens_saved_input?: number | null;
+  tokens_saved_output?: number | null;
 }
 
 export interface RdiStatus {
