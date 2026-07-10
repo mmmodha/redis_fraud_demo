@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { getFeatures } from "@/lib/api";
 import type { HeroProfile, TraceStep } from "@/lib/types";
 import { IrisPanel, EmptyPanelState } from "../IrisPanel";
+import { GUIDE_HIGHLIGHT_CLASS } from "@/lib/guidePanelHints";
+import { useGuidePanelHints } from "@/lib/useGuidePanelHints";
 
 export function FeatureStorePanel({
   hero,
@@ -11,6 +13,8 @@ export function FeatureStorePanel({
   hero: HeroProfile | null;
   steps: TraceStep[];
 }) {
+  const { guideMode, hints } = useGuidePanelHints();
+  const focusTrace = guideMode ? hints?.featureStore?.focusTraceContains : undefined;
   const [fallback, setFallback] = useState<Record<string, unknown> | null>(null);
 
   const fsSteps = steps.filter((s) => s.component === "feature_store");
@@ -19,7 +23,7 @@ export function FeatureStorePanel({
     let cancelled = false;
     setFallback(null);
     if (!hero) return;
-    if (fsSteps.length > 0) return; // trace already has data
+    if (fsSteps.length > 0) return;
     async function load() {
       const f = await getFeatures(hero!.card_id);
       if (!cancelled) setFallback(f);
@@ -37,6 +41,7 @@ export function FeatureStorePanel({
     <IrisPanel
       title="Feature Store"
       component="feature_store"
+      guideTarget="panel-feature-store"
       subtitle={hero ? `card:${hero.card_id}` : "no card selected"}
       badge={fsSteps.length > 0 ? "From trace" : fallback ? "Live fetch" : "Idle"}
       active={fsSteps.length > 0}
@@ -61,16 +66,32 @@ export function FeatureStorePanel({
 
       {fsSteps.length > 0 && (
         <div className="mt-3 font-redis-mono text-[11px] text-redis-text-secondary">
-          {fsSteps.map((s, i) => (
-            <div
-              key={`${s.tool}-${i}`}
-              className="trace-step-enter rounded-redis border border-redis-border bg-redis-bg-tertiary px-2 py-1.5"
-              style={{ animationDelay: `${i * 80}ms` }}
-            >
-              <span className="text-redis-text-muted">{s.tool}</span> · {s.latency_ms} ms ·{" "}
-              <span className="text-redis-text">{s.output_summary}</span>
-            </div>
-          ))}
+          {fsSteps.map((s, i) => {
+            const isFocus =
+              focusTrace != null &&
+              s.output_summary.toLowerCase().includes(focusTrace.toLowerCase());
+            return (
+              <div
+                key={`${s.tool}-${i}`}
+                className={`trace-step-enter rounded-redis border px-2 py-1.5 ${
+                  isFocus
+                    ? `${GUIDE_HIGHLIGHT_CLASS} border-redis-hyper`
+                    : "border-redis-border bg-redis-bg-tertiary"
+                }`}
+                style={{ animationDelay: `${i * 80}ms` }}
+              >
+                {isFocus && (
+                  <span className="mr-2 text-[9px] uppercase tracking-wider text-redis-hyper">
+                    Look here ·
+                  </span>
+                )}
+                <span className="text-redis-text-muted">{s.tool}</span> · {s.latency_ms} ms ·{" "}
+                <span className={isFocus ? "font-semibold text-redis-text" : "text-redis-text"}>
+                  {s.output_summary}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
     </IrisPanel>

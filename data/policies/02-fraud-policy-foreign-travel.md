@@ -29,7 +29,7 @@ A travel window is opened by any of:
 1. A confirmed airline or hotel booking on the cardholder's account in the
    last 90 days, with destination country matching the merchant country.
 2. A free-text travel intent captured by the chat or voice agent (e.g.
-   "I'll be travelling 10–17 Nov to Singapore"). This is stored in agent
+   "I'll be travelling 10–17 Nov to Tokyo"). This is stored in agent
    memory and read on every relevant authorisation.
 3. A self-service travel notice submitted via the mobile app.
 4. Two or more prior approved transactions in the same merchant country in
@@ -47,8 +47,7 @@ without step-up provided the other risk features are within normal bounds.
 
 ## Worked example
 
-Cardholder Jane Doe, home country US, charges SGD 480 at a Singapore
-boutique. Agent memory contains the note "travelling 10–17 Nov to
-Singapore" and her account shows a Global Airways booking three weeks
-earlier. Two travel signals are present, so the transaction is approved
-without step-up.
+Cardholder home country US, charges EUR 480 at a Paris boutique. Agent
+memory contains the note "travelling 10–17 Nov to France" and the account
+shows an Air France booking three weeks earlier. Two travel signals are
+present, so the transaction is approved without step-up.

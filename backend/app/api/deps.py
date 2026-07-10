@@ -139,4 +139,4 @@ async def shutdown() -> None:
     _agent = None
 
 
-__all__ = ["Agent", "get_backends", "get_agent", "shutdown"]
+__all__ = ["Agent", "get_backends", "get_agent", "shutdown", "_redis"]

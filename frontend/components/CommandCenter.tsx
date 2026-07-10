@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { HEROES } from "@/lib/heroes";
+import type { HeroKey } from "@/lib/demoGuide";
 import type {
   HeroProfile,
   OtpConfirmResponse,
@@ -18,29 +19,30 @@ import { FeatureStorePanel } from "./iris/FeatureStorePanel";
 import { ContextRetrieverPanel } from "./iris/ContextRetrieverPanel";
 import { AgentMemoryPanel } from "./iris/AgentMemoryPanel";
 import { ChatbotCompare } from "./ChatbotCompare";
+import { useDemoGuideOptional } from "./DemoGuideProvider";
+import { useGuidePanelHints } from "@/lib/useGuidePanelHints";
+import { GUIDE_HIGHLIGHT_CLASS } from "@/lib/guidePanelHints";
 
 export function CommandCenter() {
-  const [activeKey, setActiveKey] = useState<HeroProfile["key"]>(HEROES[1].key);
+  const [activeKey, setActiveKey] = useState<HeroProfile["key"]>(HEROES[0].key);
   const [scores, setScores] = useState<Record<string, ScoreResponse | null>>({});
   const [fastVerdicts, setFastVerdicts] = useState<
     Record<string, VerdictFastResponse | null>
   >({});
-  // Per-customer run counter. Bumped on every Run so the ChatbotCompare key
-  // changes and the side-by-side panes remount with empty state \u2014 stops
-  // stale answers from the previous scenario lingering on screen.
   const [runIds, setRunIds] = useState<Record<string, number>>({});
   const [loadingKey, setLoadingKey] = useState<string | null>(null);
-  // Wave 7j: steps now arrive live from `/agent/score/stream`, one at a time.
-  // Stored per-customer so switching heroes preserves what was already streamed.
   const [stepsByCustomer, setStepsByCustomer] = useState<Record<string, TraceStep[]>>({});
   const [thinkingByCustomer, setThinkingByCustomer] = useState<Record<string, boolean>>({});
-  // Step-up (Sarah) OTP state: per-customer; resets on every run.
   const [otpStates, setOtpStates] = useState<Record<string, OtpState>>({});
   const [otpResults, setOtpResults] = useState<
     Record<string, OtpConfirmResponse | null>
   >({});
   const [otpLatencyMs, setOtpLatencyMs] = useState<Record<string, number>>({});
   const otpFiredFor = useRef<Set<string>>(new Set());
+  const runHeroRef = useRef<(hero: HeroProfile, bypassCache?: boolean) => Promise<void>>(
+    async () => {},
+  );
+  const guide = useDemoGuideOptional();
 
   const activeHero = HEROES.find((h) => h.key === activeKey) ?? null;
   const activeScore = activeHero ? scores[activeHero.customer_id] ?? null : null;
@@ -56,9 +58,28 @@ export function CommandCenter() {
     ? thinkingByCustomer[activeHero.customer_id] ?? false
     : false;
 
-  // Step-up OTP simulation: when a REVIEW verdict lands, fire /agent/otp-confirm
-  // 1s later so the audience sees REVIEWED first, then OTP confirmed pill slide
-  // in, then APPROVED chip lands as the final breadcrumb state.
+  useEffect(() => {
+    if (!guide) return;
+    guide.registerRunHero((key: HeroKey) => {
+      const h = HEROES.find((x) => x.key === key);
+      if (h) void runHeroRef.current(h);
+    });
+    guide.registerSelectHero((key: HeroKey) => setActiveKey(key));
+  }, [guide]);
+
+  useEffect(() => {
+    if (!activeHero || activeOtpState !== "confirmed") return;
+    if (activeHero.key !== "sarah") return;
+    guide?.setOtpConfirmedForSarah(true);
+    guide?.completeAction({ type: "otp-confirmed", hero: "sarah" });
+  }, [activeHero, activeOtpState, guide]);
+
+  useEffect(() => {
+    if (!activeHero || !activeScore) return;
+    guide?.setScoreReadyForHero(activeHero.key);
+    guide?.completeAction({ type: "score-complete", hero: activeHero.key });
+  }, [activeHero, activeScore, guide]);
+
   useEffect(() => {
     if (!activeHero || !activeFast) return;
     if (activeFast.verdict !== "review") return;
@@ -88,9 +109,6 @@ export function CommandCenter() {
     return () => clearTimeout(timer);
   }, [activeHero, activeFast]);
 
-  // Wave 7n: presenter "Clear cache" reset — wipe verdicts so the UI returns
-  // to the "Pick a customer" empty state. Listens for the window event the
-  // TopBar dispatches after a successful clearDemoCache() call.
   useEffect(() => {
     function onCleared() {
       setScores({});
@@ -101,17 +119,21 @@ export function CommandCenter() {
       setOtpResults({});
       setOtpLatencyMs({});
       otpFiredFor.current.clear();
+      guide?.setScoreReadyForHero(null);
+      guide?.setCacheHitForHero(null);
+      guide?.setOtpConfirmedForSarah(false);
     }
     window.addEventListener(CACHE_CLEARED_EVENT, onCleared);
     return () => window.removeEventListener(CACHE_CLEARED_EVENT, onCleared);
-  }, []);
+  }, [guide]);
 
-  async function runHero(hero: HeroProfile, bypassCache: boolean = false) {
+  const runHero = useCallback(async (hero: HeroProfile, bypassCache: boolean = false) => {
     setLoadingKey(hero.key);
     setActiveKey(hero.key);
-    // Wipe the previous run's outputs for this hero so the verdict-fast badge
-    // and LLM reason re-animate from scratch, and bump runId so the chatbot
-    // panes remount.
+    guide?.setScoreReadyForHero(null);
+    guide?.setCacheHitForHero(null);
+    if (hero.key === "sarah") guide?.setOtpConfirmedForSarah(false);
+    guide?.completeAction({ type: "hero-run", hero: hero.key });
     setScores((prev) => ({ ...prev, [hero.customer_id]: null }));
     setFastVerdicts((prev) => ({ ...prev, [hero.customer_id]: null }));
     setStepsByCustomer((prev) => ({ ...prev, [hero.customer_id]: [] }));
@@ -125,9 +147,6 @@ export function CommandCenter() {
       [hero.customer_id]: (prev[hero.customer_id] ?? 0) + 1,
     }));
 
-    // Fast verdict fires in parallel with the streaming score endpoint: the
-    // badge paints sub-300ms while the agent trace + IRIS panels fill in
-    // live as each backend tool call lands (Wave 7j).
     const fastPromise = fetchVerdictFast(hero).catch(
       () =>
         ({
@@ -150,10 +169,19 @@ export function CommandCenter() {
           ...prev,
           [hero.customer_id]: [...(prev[hero.customer_id] ?? []), step],
         }));
+        guide?.completeAction({
+          type: "trace-component",
+          hero: hero.key,
+          component: step.component,
+        });
       },
       onFinal: (resp: ScoreResponse) => {
         setScores((prev) => ({ ...prev, [hero.customer_id]: resp }));
         setThinkingByCustomer((prev) => ({ ...prev, [hero.customer_id]: false }));
+        if (resp.cached) {
+          guide?.setCacheHitForHero(hero.key);
+          guide?.completeAction({ type: "hero-cache-hit", hero: hero.key });
+        }
       },
     };
     try {
@@ -162,7 +190,9 @@ export function CommandCenter() {
       await mockScoreStream(hero.customer_id, handlers);
     }
     setLoadingKey(null);
-  }
+  }, [guide]);
+
+  runHeroRef.current = runHero;
 
   return (
     <div className="mx-auto max-w-[1600px] px-8 py-8">
@@ -179,6 +209,7 @@ export function CommandCenter() {
       <section
         className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-2 wide:grid-cols-4"
         data-testid="hero-grid"
+        data-guide="hero-grid"
       >
         {HEROES.map((h) => (
           <HeroCard
@@ -187,13 +218,20 @@ export function CommandCenter() {
             active={activeKey === h.key}
             loading={loadingKey === h.key}
             verdict={fastVerdicts[h.customer_id]?.verdict ?? scores[h.customer_id]?.verdict ?? null}
-            onSelect={() => setActiveKey(h.key)}
+            onSelect={() => {
+              setActiveKey(h.key);
+              guide?.completeAction({ type: "hero-select", hero: h.key });
+            }}
             onRun={(bypassCache) => runHero(h, bypassCache)}
           />
         ))}
       </section>
 
-      <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div
+        className={`mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px] ${
+          guide?.guideMode ? "mr-[400px]" : ""
+        }`}
+      >
         <div className="space-y-6">
           <VerdictCard
             fast={activeFast}
@@ -222,36 +260,49 @@ export function CommandCenter() {
 }
 
 function TraceStrip({ steps, thinking }: { steps: TraceStep[]; thinking: boolean }) {
+  const { guideMode, hints } = useGuidePanelHints();
+  const traceHints = guideMode ? hints?.traceStrip : undefined;
   if (steps.length === 0 && !thinking) return null;
   return (
     <section
       data-testid="trace-strip"
+      data-guide="trace-strip"
       className="rounded-redis border border-redis-border bg-redis-bg-secondary p-4"
     >
       <div className="font-redis-mono text-[11px] uppercase tracking-wider text-redis-text-muted">
         Agent trace · {steps.length} step{steps.length === 1 ? "" : "s"}
       </div>
       <ol className="mt-2 flex flex-wrap items-center gap-2">
-        {steps.map((s, i) => (
-          <li
-            key={i}
-            className="trace-step-enter inline-flex items-center gap-2 rounded-redis border border-redis-border bg-redis-bg-tertiary px-2.5 py-1.5 font-redis-mono text-[11px]"
-            style={{ animationDelay: `${i * 50}ms` }}
-          >
-            <span className="text-redis-text-link">{i + 1}</span>
-            <span className="text-redis-text">{s.component}</span>
-            <span className="text-redis-text-muted">·</span>
-            <span className="text-redis-text-secondary">{s.tool}</span>
-            <span className="text-redis-text-muted">{s.latency_ms}ms</span>
-          </li>
-        ))}
+        {steps.map((s, i) => {
+          const focusComponent = traceHints?.focusComponent;
+          const highlighted = focusComponent != null && s.component === focusComponent;
+          return (
+            <li
+              key={i}
+              className={`trace-step-enter inline-flex items-center gap-2 rounded-redis border px-2.5 py-1.5 font-redis-mono text-[11px] ${
+                highlighted
+                  ? `${GUIDE_HIGHLIGHT_CLASS} border-redis-hyper`
+                  : "border-redis-border bg-redis-bg-tertiary"
+              }`}
+              style={{ animationDelay: `${i * 50}ms` }}
+            >
+              <span className="text-redis-text-link">{i + 1}</span>
+              <span className={highlighted ? "font-semibold text-redis-hyper" : "text-redis-text"}>
+                {s.component}
+              </span>
+              <span className="text-redis-text-muted">·</span>
+              <span className="text-redis-text-secondary">{s.tool}</span>
+              <span className="text-redis-text-muted">{s.latency_ms}ms</span>
+            </li>
+          );
+        })}
         {thinking && (
           <li
             data-testid="trace-thinking"
             className="inline-flex items-center gap-2 rounded-redis border border-redis-border bg-redis-bg-tertiary px-2.5 py-1.5 font-redis-mono text-[11px] text-redis-text-secondary animate-pulse"
           >
             <span className="text-redis-text-link">●</span>
-            <span>Claude is reasoning…</span>
+            <span>LLM is reasoning…</span>
           </li>
         )}
       </ol>

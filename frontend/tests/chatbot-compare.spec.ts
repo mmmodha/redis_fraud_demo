@@ -10,7 +10,6 @@ test.describe("Chatbot comparison panel", () => {
     page,
   }) => {
     await page.goto("/");
-    // Jane is the default active hero, but click to be explicit.
     await page.getByTestId("hero-card-jane").click();
 
     await page.getByTestId("chat-prompts").getByText("Any upcoming travel?").click();
@@ -27,8 +26,14 @@ test.describe("Chatbot comparison panel", () => {
     expect(contextText, "Context Surface must mention Singapore (from agent memory)").toMatch(
       /singapore/i,
     );
-    expect(naiveText, "Naive RAG must NOT leak customer travel destination").not.toMatch(
-      /singapore/i,
+    expect(
+      naiveText,
+      "Naive RAG must NOT cite Jane-specific travel data (memory / bookings)",
+    ).not.toMatch(
+      /2099-11-10|cust_jane|jane'?s travel|singapore airlines|marina bay|booked.*singapore/i,
+    );
+    expect(naiveText, "Naive RAG answer must differ from Context Surface").not.toEqual(
+      contextText,
     );
 
     // Wave 7i.4: markdown bold rendering. The chat_context_surface prompt
@@ -50,5 +55,20 @@ test.describe("Chatbot comparison panel", () => {
       path: resolve(SCREENSHOTS, "chatbot-comparison.png"),
       fullPage: true,
     });
+  });
+
+  test("repeat prompt shows LangCache token savings", async ({ page }) => {
+    await page.goto("/");
+    await page.getByTestId("hero-card-jane").click();
+    const prompt = page.getByTestId("chat-prompts").getByText("Any upcoming travel?");
+    await prompt.click();
+    await expect(page.getByTestId("pane-context-answer")).not.toHaveText("Thinking…", {
+      timeout: 15_000,
+    });
+    await prompt.click();
+    await expect(
+      page.getByTestId("pane-context").getByTestId("langcache-savings-bar"),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByTestId("langcache-session-counter")).toContainText(/tokens saved/i);
   });
 });

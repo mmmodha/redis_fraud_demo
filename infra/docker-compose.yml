@@ -89,6 +89,11 @@ services:
       AGENT_MODE: ${AGENT_MODE:-}
       CTX_AGENT_KEY: ${CTX_AGENT_KEY:-}
       CTX_ADMIN_KEY: ${CTX_ADMIN_KEY:-}
+      LANGCACHE_SERVER_URL: ${LANGCACHE_SERVER_URL:-}
+      LANGCACHE_CACHE_ID: ${LANGCACHE_CACHE_ID:-}
+      LANGCACHE_API_KEY: ${LANGCACHE_API_KEY:-}
+      LANGCACHE_SIMILARITY_THRESHOLD: ${LANGCACHE_SIMILARITY_THRESHOLD:-}
+      LANGCACHE_SEMANTIC_THRESHOLD: ${LANGCACHE_SEMANTIC_THRESHOLD:-}
     ports:
       - "8000:8000"
     # Mount the policy corpus so the seeder can call build_index() inside
@@ -184,8 +189,7 @@ services:
       - -lc
       - >-
         npm install --no-audit --no-fund --silent
-        && npx playwright test tests/hero-scenarios.spec.ts
-        --grep mike --reporter=line
+        && npx playwright test tests/hero-scenarios.spec.ts tests/guide-mode.spec.ts tests/chatbot-compare.spec.ts tests/guide-step15-diagram.spec.ts --reporter=line
 
 volumes:
   postgres_data:

@@ -11,6 +11,7 @@ build/
 out/
 .next/
 .turbo/
+*.tsbuildinfo
 
 # Python
 __pycache__/

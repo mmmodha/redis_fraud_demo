@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request, R
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from app import verdict_cache
+from app import chat_cache, verdict_cache
 from app.agent_tools import call_tool
 from app.api.deps import Agent, _redis, get_agent, get_backends
 from app.policy_engine import evaluate_verdict_fast
@@ -294,7 +294,8 @@ async def cache_clear(req: Optional[CacheClearRequest] = None) -> CacheClearResp
         raise HTTPException(status_code=503, detail="REDIS_URL is not set")
     customer_id = req.customer_id if req else None
     cleared = await verdict_cache.clear(redis_client, customer_id)
-    return CacheClearResponse(cleared=cleared)
+    chat_cleared = await chat_cache.clear(redis_client, customer_id)
+    return CacheClearResponse(cleared=cleared + chat_cleared)
 
 
 @router.post("/verdict-fast", response_model=VerdictFastResponse)

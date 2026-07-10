@@ -26,6 +26,7 @@ export function HeroCard({ hero, active, loading, verdict, onSelect, onRun }: Pr
       type="button"
       onClick={onSelect}
       data-testid={`hero-card-${hero.key}`}
+      data-guide={`hero-${hero.key}`}
       data-active={active}
       data-verdict-revealed={verdict ? "true" : "false"}
       className={`group relative flex flex-col gap-3 rounded-redis border bg-redis-bg-secondary p-6 text-left transition-colors duration-200 ${
@@ -86,6 +87,7 @@ export function HeroCard({ hero, active, loading, verdict, onSelect, onRun }: Pr
           onRun(e.shiftKey);
         }}
         data-testid={`run-${hero.key}`}
+        data-guide={`hero-run-${hero.key}`}
         className={`mt-auto inline-flex min-h-11 cursor-pointer items-center justify-center rounded-redis border border-redis-border-secondary border-l-[4px] border-l-redis-hyper bg-redis-bg-tertiary px-6 py-2 font-redis-body text-sm font-semibold text-redis-text transition-colors duration-200 hover:bg-redis-border ${
           loading ? "opacity-70" : ""
         }`}

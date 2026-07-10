@@ -3,18 +3,17 @@
 ![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)
 ![FastAPI](https://img.shields.io/badge/FastAPI-Python%203.12-009688?logo=fastapi)
 ![Redis](https://img.shields.io/badge/Redis-IRIS-DC382D?logo=redis)
-![Anthropic Claude](https://img.shields.io/badge/Anthropic-Claude%20Sonnet-D97757?logo=anthropic)
 ![License](https://img.shields.io/badge/license-Apache%202.0-blue)
 
-A narrative, sub-second fraud-detection demo: a Claude-powered agent
-uses **Redis IRIS** (RDI, Feature Store, Context Retriever, Agent
-Memory) to approve or block card transactions while you watch. It is
-aimed at banking architects and AI teams who want to see the four IRIS
-surfaces working together in one running stack, not a slide deck.
-Audiences see three hero customers — one auto-approved, one
-near-miss recovered by context, one blocked — each decision rendered
-live alongside the Redis keys, vector searches, and tool calls that
-produced it.
+A narrative, sub-second fraud-detection demo: an LLM-powered agent uses
+**Redis IRIS** (RDI, Feature Store, Context Retriever, Agent Memory) plus
+**LangCache** to approve, step-up, or block card transactions while you
+watch. Aimed at banking architects and AI teams who want to see the IRIS
+surfaces working together in one running stack — not a slide deck.
+
+Audiences follow four hero customers — routine approve, near-miss recovered
+by context, fraud blocked, step-up OTP — each decision rendered live
+alongside the Redis keys, vector searches, and tool calls that produced it.
 
 ## Hero moments
 
@@ -22,6 +21,10 @@ produced it.
 | ------------------- | -------------------------- | -------------------- |
 | ![Mike auto-approve](docs/screenshots/hero-mike.png) | ![Jane review](docs/screenshots/hero-jane.png) | ![Alex blocked](docs/screenshots/hero-alex.png) |
 | Feature Store answers in ~50 ms; no human, no LLM. | Agent Memory + Context Retriever flip a "block" into an "approve" in <1 s. | High-risk features + policy match → block, with the Redis evidence trail. |
+
+Sarah adds a fourth beat — **step-up auth** (OTP) for a high-value purchase
+that is neither auto-approve nor block. See
+[`docs/screenshots/hero-sarah-reviewed.png`](docs/screenshots/hero-sarah-reviewed.png).
 
 The full dashboard, with all four IRIS panels visible, is in
 [`docs/screenshots/command-center.png`](docs/screenshots/command-center.png).
@@ -37,14 +40,16 @@ API keys, no managed services.**
 | ----------------- | ----------------- |
 | Docker Desktop / Docker Engine + Compose v2 | The entire host-tooling list. |
 | `redis-stack` container (auto-started)      | Redis with RediSearch + RedisJSON, locally. |
-| Mock-Claude (auto-selected)                 | Canned per-hero SSE traces with realistic latency — no Anthropic key. |
+| Mock agent (auto-selected)                  | Canned per-hero SSE traces with realistic latency — no LLM API key. |
 | Synthetic Postgres + RDI-emulator           | Seeded automatically; no external DB. |
+| Local LangCache layer                       | Semantic cache for chat + verdict replay in Redis. |
 
 | Opt-in (presenter / on-stage) | When to use it |
 | ----------------------------- | -------------- |
 | **Redis Cloud** (`REDIS_URL`) | Show the live IRIS surfaces in the Redis Cloud console alongside the demo UI. |
 | **Anthropic API key** (`ANTHROPIC_API_KEY`) | Real Claude Sonnet tool-use instead of the canned trace. |
 | **Context Retriever admin key** (`CTX_ADMIN_KEY`) | Provision the managed Context Retriever surface for the on-stage path. |
+| **LangCache Cloud** (`LANGCACHE_*`) | Managed semantic cache instead of the local Redis fallback. |
 
 Toggling between bundled and opt-in is one env var at a time. See
 [Architecture](#architecture) for where each toggle takes effect.
@@ -102,7 +107,7 @@ make demo
 # 5. Open the URL the previous step printed (also auto-opens on macOS / Linux)
 #    http://localhost:3000
 
-# 6. Click any of the three hero customer cards on the dashboard.
+# 6. Click any hero customer card — or toggle Guide mode for a paced walkthrough.
 ```
 
 That's it. `make demo` is idempotent — rerun it any time to bring the
@@ -111,14 +116,15 @@ stack back to a clean, seeded state.
 > **You do not need to generate or build the data yourself.** Postgres
 > starts empty; `make demo` runs a one-shot `seeder` container that
 > populates Postgres, then RDI streams it into Redis. The synthetic
-> bank, the three hero customers, the 10k transactions, and the agent
+> bank, the four hero customers, the 10k transactions, and the agent
 > memory are all created end-to-end by `make demo`. There is no
 > separate "generate data" step to run.
 
 To go from the bundled path to the on-stage path, fill in `REDIS_URL`,
-`ANTHROPIC_API_KEY`, and (optionally) `CTX_ADMIN_KEY` in `.env`, then
-run `make demo` again. Every variable is documented inline in
-[`.env.example`](.env.example) with its "blank fallback" behaviour.
+`ANTHROPIC_API_KEY`, and (optionally) `CTX_ADMIN_KEY` / `LANGCACHE_*`
+in `.env`, then run `make demo` again. Every variable is documented
+inline in [`.env.example`](.env.example) with its "blank fallback"
+behaviour.
 
 ### What `make demo` does
 
@@ -132,8 +138,8 @@ demo-ready. The data-generation steps are 3–5:
    `infra/postgres/init.sql` is an intentional placeholder.
 3. **Seed Postgres** — `compose run --rm seeder python -m data.seed`
    applies `data/schema.sql` and generates the synthetic core-banking
-   data: customers (incl. heroes Mike / Jane / Alex), accounts, cards,
-   devices, merchants, MCCs, and ~10k transactions
+   data: customers (incl. heroes Mike / Jane / Alex / Sarah), accounts,
+   cards, devices, merchants, MCCs, and ~10k transactions
    (`data/seed.py`, `data/heroes.py`, `data/traffic.py`).
 4. **Stream into Redis** — the `rdi` service tails Postgres logical
    replication and writes the canonical Redis keys
@@ -155,23 +161,42 @@ the [`data/`](data/) package.
 
 ---
 
+## Guide mode (self-paced tour)
+
+Toggle **Guide mode** in the top bar for a paced educational walkthrough.
+The side panel explains what Redis is doing at each step — use **Continue**
+to move at your own speed.
+
+- **Mike** — full IRIS tutorial (trace, Feature Store, Context Retriever)
+- **Jane** — travel memory, analyst chatbot, LangCache on chat + verdict replay
+- **Alex / Sarah** — focused fraud-block and step-up stories
+- **Recap** — business summary, then **Finish tour**
+
+Capability steps embed the same animated **How IRIS works** diagrams
+(RDI, Context Retriever, Agent Memory, LangCache) shown in the top-bar
+architecture tab. Guide copy is LLM-agnostic: Redis improves accuracy and
+cost for whatever model the bank uses.
+
+Full presenter script: [`docs/runbook.md`](docs/runbook.md) (Guide mode section).
+
+---
+
 ## Run-of-show
 
-**Open with the dashboard.** Three hero cards sit side-by-side: Mike
-(green — all clear), Jane (amber — needs sub-second review), Alex
-(red — blocked). A live transaction feed scrolls beneath them. The
-shape of the screen tells the story before anyone says a word.
+**Open with the dashboard.** Four hero cards: Mike (routine), Jane
+(near-miss), Alex (blocked), Sarah (step-up). A live transaction feed
+scrolls beneath them.
 
 **Click each hero in turn.** Each click drops into a single customer
 view with four IRIS panels (RDI lag, Feature Store keys, Context
 Retriever tool calls, Agent Memory) updating in real time as the
-verdict streams in. The panels are not decorations — they are the
-actual Redis reads and tool calls that produced the verdict.
+verdict streams in.
 
 **Close with the chatbot.** A side-by-side comparison sends every
 prompt through both *naive RAG* (policy docs only) and *Context
-Surface* (policy docs + live IRIS context). Same Claude model. Same
-policy corpus. Different context. The answers diverge on screen.
+Surface* (policy docs + live IRIS context). Same LLM. Same policy
+corpus. Different context. Repeat a question to show **LangCache**
+token savings.
 
 The minute-by-minute presenter script is in
 [`docs/runbook.md`](docs/runbook.md); quotable lines for the webinar
@@ -200,8 +225,8 @@ are in [`docs/talking-points.md`](docs/talking-points.md).
    `make demo` and watch the first few lines — it prints the resolved
    `Redis mode` and `Agent mode` so you can spot a typo immediately.
 
-5. **"Why is the Claude trace identical every time?"** You are in
-   mock-Claude mode (the zero-account default). Set
+5. **"Why is the agent trace identical every time?"** You are in
+   mock-agent mode (the zero-account default). Set
    `ANTHROPIC_API_KEY` in `.env` and rerun `make demo` for the real
    Sonnet tool-use trace. The on-screen "Agent mode" badge in the UI
    tells you which mode is live.
@@ -225,10 +250,11 @@ Postgres (synthetic core banking)
                          ├── Feature Store      (Hash / JSON per customer + card)
                          ├── Context Retriever  (managed entities + MCP-style tools)
                          ├── Agent Memory       (JSON doc per customer)
+                         ├── LangCache layer    (local semantic cache OR LangCache Cloud)
                          └── Policy / Study Index (RediSearch vector)
                                   ▲
                                   │
-                  FastAPI backend ◄── Claude  (real Sonnet  ──or──  mock SSE trace)
+                  FastAPI backend ◄── LLM agent  (real Sonnet  ──or──  mock SSE trace)
                           ▲                       ▲                    ▲
                           │                       │                    │
                   Next.js demo UI         ANTHROPIC_API_KEY      AGENT_MODE=mock
@@ -242,9 +268,6 @@ The two **mock-vs-real toggle points** are:
 - `AGENT_MODE` (auto-resolved from `ANTHROPIC_API_KEY`) — blank +
   no key → `mock`; key present → `claude`; explicit `stub` for the
   deterministic test harness. The UI badge labels which one is live.
-
-The editable diagram is [`docs/architecture.excalidraw`](docs/architecture.excalidraw)
-(open in [excalidraw.com](https://excalidraw.com) → File → Open).
 
 ---
 

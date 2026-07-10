@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { checkHealth, clearDemoCache } from "@/lib/api";
 import { IrisDiagramModal } from "./IrisDiagramModal";
+import { useDemoGuide } from "./DemoGuideProvider";
 
 // Wave 7n: presenter "Clear cache" affordance fires a window event so the
 // CommandCenter (which owns hero verdict state) resets without prop drilling.
@@ -11,6 +12,7 @@ export function TopBar() {
   const [live, setLive] = useState<boolean | null>(null);
   const [irisModalOpen, setIrisModalOpen] = useState(false);
   const [clearState, setClearState] = useState<"idle" | "clearing" | "done">("idle");
+  const { guideMode, setGuideMode } = useDemoGuide();
   const showCacheClear = process.env.NEXT_PUBLIC_DEMO_CACHE_CLEAR === "true";
 
   async function onClearCache() {
@@ -93,6 +95,17 @@ export function TopBar() {
             Context Retriever ↗
           </a>
         )}
+        <button
+          type="button"
+          onClick={() => setGuideMode(!guideMode)}
+          data-testid="guide-mode-toggle"
+          title="Step-by-step guided demo with highlights"
+          className={`font-redis-body text-sm font-medium hover:underline ${
+            guideMode ? "text-redis-hyper" : "text-redis-text-link hover:text-redis-hyper"
+          }`}
+        >
+          {guideMode ? "Guide on" : "Guide mode"}
+        </button>
         <button
           type="button"
           onClick={() => setIrisModalOpen(true)}
