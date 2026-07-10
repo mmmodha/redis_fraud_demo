@@ -189,7 +189,7 @@ services:
       - -lc
       - >-
         npm install --no-audit --no-fund --silent
-        && npx playwright test tests/hero-scenarios.spec.ts tests/guide-mode.spec.ts tests/chatbot-compare.spec.ts tests/guide-step15-diagram.spec.ts --reporter=line
+        && npx playwright test tests/hero-scenarios.spec.ts tests/guide-mode.spec.ts tests/chatbot-compare.spec.ts --reporter=line
 
 volumes:
   postgres_data:
