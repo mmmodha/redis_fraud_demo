@@ -12,6 +12,8 @@ interface Props {
   // Wave 7n: Shift+click on Run forces a cache bypass (fresh agent run that
   // still writes-through to cache). Presenters know; no audience-facing hint.
   onRun: (bypassCache: boolean) => void;
+  /** When guide mode owns the run step, hide the card Run button. */
+  guideHideRun?: boolean;
 }
 
 const verdictMeta: Record<Verdict, { label: string; cls: string }> = {
@@ -20,7 +22,7 @@ const verdictMeta: Record<Verdict, { label: string; cls: string }> = {
   block: { label: "Block", cls: "bg-verdict-block/15 text-verdict-block border-verdict-block/40" },
 };
 
-export function HeroCard({ hero, active, loading, verdict, onSelect, onRun }: Props) {
+export function HeroCard({ hero, active, loading, verdict, onSelect, onRun, guideHideRun }: Props) {
   return (
     <button
       type="button"
@@ -79,21 +81,31 @@ export function HeroCard({ hero, active, loading, verdict, onSelect, onRun }: Pr
         </p>
       </div>
 
-      <span
-        role="button"
-        tabIndex={-1}
-        onClick={(e) => {
-          e.stopPropagation();
-          onRun(e.shiftKey);
-        }}
-        data-testid={`run-${hero.key}`}
-        data-guide={`hero-run-${hero.key}`}
-        className={`mt-auto inline-flex min-h-11 cursor-pointer items-center justify-center rounded-redis border border-redis-border-secondary border-l-[4px] border-l-redis-hyper bg-redis-bg-tertiary px-6 py-2 font-redis-body text-sm font-semibold text-redis-text transition-colors duration-200 hover:bg-redis-border ${
-          loading ? "opacity-70" : ""
-        }`}
-      >
-        {loading ? "Scoring…" : "▶ Run scenario"}
-      </span>
+      {guideHideRun ? (
+        <p
+          data-testid={`hero-run-hidden-${hero.key}`}
+          className="mt-auto rounded-redis border border-dashed border-redis-border px-4 py-2.5 text-center font-redis-body text-xs text-redis-text-muted"
+        >
+          Use <span className="font-semibold text-redis-hyper">Run scenario</span> in the guide
+          panel →
+        </p>
+      ) : (
+        <span
+          role="button"
+          tabIndex={-1}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRun(e.shiftKey);
+          }}
+          data-testid={`run-${hero.key}`}
+          data-guide={`hero-run-${hero.key}`}
+          className={`mt-auto inline-flex min-h-11 cursor-pointer items-center justify-center rounded-redis border border-redis-border-secondary border-l-[4px] border-l-redis-hyper bg-redis-bg-tertiary px-6 py-2 font-redis-body text-sm font-semibold text-redis-text transition-colors duration-200 hover:bg-redis-border ${
+            loading ? "opacity-70" : ""
+          }`}
+        >
+          {loading ? "Scoring…" : "▶ Run scenario"}
+        </span>
+      )}
     </button>
   );
 }

@@ -22,6 +22,7 @@ import { ChatbotCompare } from "./ChatbotCompare";
 import { useDemoGuideOptional } from "./DemoGuideProvider";
 import { useGuidePanelHints } from "@/lib/useGuidePanelHints";
 import { GUIDE_HIGHLIGHT_CLASS } from "@/lib/guidePanelHints";
+import { isGuideRunStepForHero } from "@/lib/demoGuide";
 
 export function CommandCenter() {
   const [activeKey, setActiveKey] = useState<HeroProfile["key"]>(HEROES[0].key);
@@ -132,8 +133,8 @@ export function CommandCenter() {
     setActiveKey(hero.key);
     guide?.setScoreReadyForHero(null);
     guide?.setCacheHitForHero(null);
+    guide?.setIsScoringHero(hero.key);
     if (hero.key === "sarah") guide?.setOtpConfirmedForSarah(false);
-    guide?.completeAction({ type: "hero-run", hero: hero.key });
     setScores((prev) => ({ ...prev, [hero.customer_id]: null }));
     setFastVerdicts((prev) => ({ ...prev, [hero.customer_id]: null }));
     setStepsByCustomer((prev) => ({ ...prev, [hero.customer_id]: [] }));
@@ -178,6 +179,9 @@ export function CommandCenter() {
       onFinal: (resp: ScoreResponse) => {
         setScores((prev) => ({ ...prev, [hero.customer_id]: resp }));
         setThinkingByCustomer((prev) => ({ ...prev, [hero.customer_id]: false }));
+        guide?.setScoreReadyForHero(hero.key);
+        guide?.completeAction({ type: "score-complete", hero: hero.key });
+        guide?.completeAction({ type: "hero-run", hero: hero.key });
         if (resp.cached) {
           guide?.setCacheHitForHero(hero.key);
           guide?.completeAction({ type: "hero-cache-hit", hero: hero.key });
@@ -190,12 +194,17 @@ export function CommandCenter() {
       await mockScoreStream(hero.customer_id, handlers);
     }
     setLoadingKey(null);
+    guide?.setIsScoringHero(null);
   }, [guide]);
 
   runHeroRef.current = runHero;
 
   return (
-    <div className="mx-auto max-w-[1600px] px-8 py-8">
+    <div
+      className={`mx-auto max-w-[1600px] px-8 py-8 ${
+        guide?.guideMode ? "pr-[min(400px,35vw)] max-xl:pr-[340px]" : ""
+      }`}
+    >
       <section>
         <h1 className="font-redis-body text-3xl font-bold tracking-tight">
           Pick a customer. Watch Redis IRIS decide.
@@ -218,6 +227,10 @@ export function CommandCenter() {
             active={activeKey === h.key}
             loading={loadingKey === h.key}
             verdict={fastVerdicts[h.customer_id]?.verdict ?? scores[h.customer_id]?.verdict ?? null}
+            guideHideRun={
+              guide?.guideMode === true &&
+              isGuideRunStepForHero(guide.currentStep, h.key)
+            }
             onSelect={() => {
               setActiveKey(h.key);
               guide?.completeAction({ type: "hero-select", hero: h.key });
@@ -227,11 +240,7 @@ export function CommandCenter() {
         ))}
       </section>
 
-      <div
-        className={`mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px] ${
-          guide?.guideMode ? "mr-[400px]" : ""
-        }`}
-      >
+      <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="space-y-6">
           <VerdictCard
             fast={activeFast}

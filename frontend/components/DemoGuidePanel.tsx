@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useDemoGuide } from "./DemoGuideProvider";
 import { GuideIrisDiagram } from "./GuideIrisDiagram";
 import { GUIDE_STEPS, type HeroKey } from "@/lib/demoGuide";
+import { copyToClipboard } from "@/lib/clipboard";
 
 export function DemoGuidePanel() {
   const {
@@ -15,12 +16,15 @@ export function DemoGuidePanel() {
     skipStep,
     resetGuide,
     runHeroForGuide,
+    insertChatMessage,
     scoreReadyForHero,
     otpConfirmedForSarah,
     cacheHitForHero,
+    isScoringHero,
+    isChatLoading,
   } = useDemoGuide();
 
-  const [copied, setCopied] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "manual">("idle");
 
   if (!guideMode || !currentStep) return null;
 
@@ -40,14 +44,32 @@ export function DemoGuidePanel() {
   const cacheReady =
     !requiresCacheHit || (step.hero != null && cacheHitForHero === step.hero);
 
-  const canContinue = isManual && scoreReady && otpReady && cacheReady;
+  const scoringActive = isScoringHero != null;
+  const canContinue =
+    isManual && scoreReady && otpReady && cacheReady && !scoringActive;
 
-  function handleCopySuggested() {
+  const thinkingMessage = scoringActive
+    ? "Running scenario — Redis is assembling context…"
+    : isChatLoading
+      ? "Chatbot is thinking — both sides are answering…"
+      : requiresScore && !scoreReady
+        ? "Waiting for analyst summary to finish loading…"
+        : requiresOtp && !otpReady
+          ? "Waiting for OTP confirmation…"
+          : requiresCacheHit && !cacheReady
+            ? "Waiting for LangCache replay on the verdict card…"
+            : null;
+
+  async function handleCopySuggested() {
     if (!step.suggestedText) return;
-    navigator.clipboard.writeText(step.suggestedText).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    const result = await copyToClipboard(step.suggestedText);
+    setCopyStatus(result === "manual" ? "manual" : "copied");
+    setTimeout(() => setCopyStatus("idle"), 3000);
+  }
+
+  function handleInsertChat() {
+    if (!step.suggestedText) return;
+    insertChatMessage(step.suggestedText);
   }
 
   function handleRunHero() {
@@ -58,7 +80,7 @@ export function DemoGuidePanel() {
   return (
     <aside
       data-testid="demo-guide-panel"
-      className="fixed right-0 top-[73px] z-40 flex h-[calc(100vh-73px)] w-[400px] flex-col border-l border-redis-border bg-redis-bg-secondary shadow-[-8px_0_24px_rgba(0,0,0,0.35)]"
+      className="fixed right-0 top-[73px] z-40 flex h-[calc(100vh-73px)] w-[min(400px,35vw)] max-xl:w-[340px] flex-col border-l border-redis-border bg-redis-bg-secondary shadow-[-8px_0_24px_rgba(0,0,0,0.35)]"
     >
       <div className="flex items-center justify-between border-b border-redis-border px-4 py-3">
         <div>
@@ -77,6 +99,17 @@ export function DemoGuidePanel() {
           Close
         </button>
       </div>
+
+      {thinkingMessage && (
+        <div
+          data-testid="guide-thinking-banner"
+          className="border-b border-redis-hyper/30 bg-redis-hyper/10 px-4 py-3"
+        >
+          <p className="font-redis-body text-sm font-semibold text-redis-hyper animate-pulse">
+            {thinkingMessage}
+          </p>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
         <h2 className="font-redis-body text-lg font-bold text-redis-text">
@@ -127,39 +160,48 @@ export function DemoGuidePanel() {
             <p className="mt-1 font-redis-body text-sm font-semibold text-redis-text">
               {step.suggestedText}
             </p>
-            <button
-              type="button"
-              onClick={handleCopySuggested}
-              className="mt-2 font-redis-mono text-[10px] uppercase tracking-wider text-redis-text-link hover:text-redis-hyper"
-            >
-              {copied ? "Copied!" : "Copy to clipboard"}
-            </button>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                data-testid="guide-insert-chat"
+                onClick={handleInsertChat}
+                className="rounded-redis bg-redis-hyper px-3 py-1.5 font-redis-body text-xs font-semibold text-white hover:opacity-90"
+              >
+                Insert into chat
+              </button>
+              <button
+                type="button"
+                data-testid="guide-copy-suggested"
+                onClick={handleCopySuggested}
+                className="rounded-redis border border-redis-border bg-redis-bg-tertiary px-3 py-1.5 font-redis-mono text-[10px] uppercase tracking-wider text-redis-text-link hover:text-redis-hyper"
+              >
+                {copyStatus === "copied"
+                  ? "Copied!"
+                  : copyStatus === "manual"
+                    ? "Select text & press Ctrl+C / Cmd+C"
+                    : "Copy to clipboard"}
+              </button>
+            </div>
             <p className="mt-2 font-redis-body text-[11px] leading-snug text-redis-text-muted">
-              Paste into the chat box below, then press Enter or click Ask both.
+              Then press Enter or click Ask both to send.
             </p>
           </div>
-        )}
-
-        {requiresScore && !scoreReady && (
-          <p className="mt-4 font-redis-body text-xs text-redis-text-muted animate-pulse">
-            Waiting for analyst summary to finish loading…
-          </p>
-        )}
-
-        {requiresOtp && !otpReady && (
-          <p className="mt-4 font-redis-body text-xs text-redis-text-muted animate-pulse">
-            Waiting for OTP confirmation…
-          </p>
-        )}
-
-        {requiresCacheHit && !cacheReady && (
-          <p className="mt-4 font-redis-body text-xs text-redis-text-muted animate-pulse">
-            Waiting for LangCache replay on the verdict card…
-          </p>
         )}
       </div>
 
       <div className="space-y-2 border-t border-redis-border px-4 py-3">
+        {step.suggestedAction === "run-hero" && (
+          <button
+            type="button"
+            data-testid="guide-run-hero"
+            onClick={handleRunHero}
+            disabled={scoringActive}
+            className="w-full rounded-redis bg-redis-hyper px-3 py-2.5 font-redis-body text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+          >
+            {scoringActive ? "Running scenario…" : "Run scenario"}
+          </button>
+        )}
+
         {step.suggestedAction === "close-guide" ? (
           <button
             type="button"
@@ -180,17 +222,6 @@ export function DemoGuidePanel() {
               Continue
             </button>
           )
-        )}
-
-        {step.suggestedAction === "run-hero" && (
-          <button
-            type="button"
-            data-testid="guide-run-hero"
-            onClick={handleRunHero}
-            className="w-full rounded-redis border border-redis-hyper bg-redis-hyper/10 px-3 py-2.5 font-redis-body text-sm font-semibold text-redis-hyper hover:bg-redis-hyper/20"
-          >
-            Run scenario
-          </button>
         )}
 
         <div className="flex gap-2">
