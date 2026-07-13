@@ -22,7 +22,7 @@ import { ChatbotCompare } from "./ChatbotCompare";
 import { useDemoGuideOptional } from "./DemoGuideProvider";
 import { useGuidePanelHints } from "@/lib/useGuidePanelHints";
 import { GUIDE_HIGHLIGHT_CLASS } from "@/lib/guidePanelHints";
-import { isGuideRunStepForHero } from "@/lib/demoGuide";
+import { guideAllowsHeroRun, isGuideRunStepForHero } from "@/lib/demoGuide";
 
 export function CommandCenter() {
   const [activeKey, setActiveKey] = useState<HeroProfile["key"]>(HEROES[0].key);
@@ -220,24 +220,42 @@ export function CommandCenter() {
         data-testid="hero-grid"
         data-guide="hero-grid"
       >
-        {HEROES.map((h) => (
+        {HEROES.map((h) => {
+          const guideOn = guide?.guideMode === true;
+          const step = guide?.currentStep ?? null;
+          const isRunStep = isGuideRunStepForHero(step, h.key);
+          const isMeetHero =
+            step?.hero === h.key &&
+            step.activateHero === h.key &&
+            !isRunStep;
+          return (
           <HeroCard
             key={h.key}
             hero={h}
             active={activeKey === h.key}
             loading={loadingKey === h.key}
             verdict={fastVerdicts[h.customer_id]?.verdict ?? scores[h.customer_id]?.verdict ?? null}
-            guideHideRun={
-              guide?.guideMode === true &&
-              isGuideRunStepForHero(guide.currentStep, h.key)
+            guideHideRun={guideOn}
+            guideRunHint={
+              !guideOn
+                ? undefined
+                : isRunStep
+                  ? "use-panel"
+                  : isMeetHero
+                    ? "next-step"
+                    : "follow-guide"
             }
             onSelect={() => {
               setActiveKey(h.key);
               guide?.completeAction({ type: "hero-select", hero: h.key });
             }}
-            onRun={(bypassCache) => runHero(h, bypassCache)}
+            onRun={(bypassCache) => {
+              if (guideOn && !guideAllowsHeroRun(step, h.key)) return;
+              void runHero(h, bypassCache);
+            }}
           />
-        ))}
+          );
+        })}
       </section>
 
       <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">

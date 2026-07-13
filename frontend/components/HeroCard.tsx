@@ -12,8 +12,10 @@ interface Props {
   // Wave 7n: Shift+click on Run forces a cache bypass (fresh agent run that
   // still writes-through to cache). Presenters know; no audience-facing hint.
   onRun: (bypassCache: boolean) => void;
-  /** When guide mode owns the run step, hide the card Run button. */
+  /** When guide mode blocks the card Run button. */
   guideHideRun?: boolean;
+  /** Hint shown when Run is blocked during guide mode. */
+  guideRunHint?: "use-panel" | "next-step" | "follow-guide";
 }
 
 const verdictMeta: Record<Verdict, { label: string; cls: string }> = {
@@ -22,7 +24,7 @@ const verdictMeta: Record<Verdict, { label: string; cls: string }> = {
   block: { label: "Block", cls: "bg-verdict-block/15 text-verdict-block border-verdict-block/40" },
 };
 
-export function HeroCard({ hero, active, loading, verdict, onSelect, onRun, guideHideRun }: Props) {
+export function HeroCard({ hero, active, loading, verdict, onSelect, onRun, guideHideRun, guideRunHint }: Props) {
   return (
     <button
       type="button"
@@ -86,8 +88,16 @@ export function HeroCard({ hero, active, loading, verdict, onSelect, onRun, guid
           data-testid={`hero-run-hidden-${hero.key}`}
           className="mt-auto rounded-redis border border-dashed border-redis-border px-4 py-2.5 text-center font-redis-body text-xs text-redis-text-muted"
         >
-          Use <span className="font-semibold text-redis-hyper">Run scenario</span> in the guide
-          panel →
+          {guideRunHint === "use-panel" ? (
+            <>
+              Use <span className="font-semibold text-redis-hyper">Run scenario</span> in the guide
+              panel →
+            </>
+          ) : guideRunHint === "next-step" ? (
+            <>Continue in the guide — you&apos;ll run this scenario in the next step.</>
+          ) : (
+            <>Follow the guide panel for when to run scenarios.</>
+          )}
         </p>
       ) : (
         <span

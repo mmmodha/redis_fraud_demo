@@ -17,6 +17,19 @@ test.describe("Guide mode", () => {
     await expect(page.locator('[data-guide="hero-mike"]')).toHaveAttribute("data-active", "true");
   });
 
+  test("meet step blocks hero run before run step", async ({ page }) => {
+    await page.goto("/");
+    await page.getByTestId("guide-mode-toggle").click();
+    await page.getByTestId("guide-continue").click(); // welcome → meet Mike
+
+    await expect(page.getByText("Meet Mike — everyday spending")).toBeVisible();
+    await expect(page.getByTestId("run-mike")).toHaveCount(0);
+    await expect(page.getByTestId("hero-run-hidden-mike")).toContainText(
+      "next step",
+    );
+    await expect(page.getByTestId("guide-run-hero")).toHaveCount(0);
+  });
+
   test("run step hides hero card Run and advances only after score completes", async ({
     page,
   }) => {

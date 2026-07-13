@@ -7,7 +7,7 @@ import { JsonTree } from "@/components/JsonTree";
 import { Prose } from "@/components/Prose";
 import { COMPONENT_CHIP, COMPONENT_LABEL } from "@/lib/traceColors";
 import { useDemoGuideOptional } from "@/components/DemoGuideProvider";
-import { stepExpectsEvent } from "@/lib/demoGuide";
+import { guideAllowsChatFreeSend, guideAllowsChatPrompt, stepExpectsEvent } from "@/lib/demoGuide";
 import {
   LangCacheBaselineRow,
   LangCacheHitBanner,
@@ -67,6 +67,12 @@ export function ChatbotCompare({ hero }: { hero: HeroProfile | null }) {
 
   async function send(q: string, promptIndex?: number) {
     if (!hero || !q.trim()) return;
+    const step = guide?.currentStep ?? null;
+    const guideOn = guide?.guideMode === true;
+    if (guideOn) {
+      if (promptIndex !== undefined && !guideAllowsChatPrompt(step, promptIndex)) return;
+      if (promptIndex === undefined && !guideAllowsChatFreeSend(step)) return;
+    }
     setTurn({ q, context: null, naive: null, loading: true });
     guide?.setIsChatLoading(true);
     const req = { customer_id: hero.customer_id, message: q };
@@ -101,6 +107,9 @@ export function ChatbotCompare({ hero }: { hero: HeroProfile | null }) {
       guide?.setIsChatLoading(false);
     }
   }
+
+  const guideOn = guide?.guideMode === true;
+  const guideStep = guide?.currentStep ?? null;
 
   return (
     <section
@@ -160,17 +169,21 @@ export function ChatbotCompare({ hero }: { hero: HeroProfile | null }) {
 
       <div className="border-t border-redis-border px-5 py-3">
         <div className="flex flex-wrap gap-2" data-testid="chat-prompts">
-          {PROMPTS.map((p, i) => (
+          {PROMPTS.map((p, i) => {
+            const promptAllowed = !guideOn || guideAllowsChatPrompt(guideStep, i);
+            return (
             <button
               key={p}
               type="button"
               data-guide={`chat-prompt-${i}`}
+              disabled={!hero || !promptAllowed}
               onClick={() => send(p, i)}
-              className="rounded-redis border border-redis-border bg-redis-bg-tertiary px-3 py-1.5 font-redis-body text-xs text-redis-text-secondary transition-colors hover:border-redis-hyper hover:text-redis-text"
+              className="rounded-redis border border-redis-border bg-redis-bg-tertiary px-3 py-1.5 font-redis-body text-xs text-redis-text-secondary transition-colors hover:border-redis-hyper hover:text-redis-text disabled:cursor-not-allowed disabled:opacity-40"
             >
               {p}
             </button>
-          ))}
+            );
+          })}
         </div>
         <form
           data-guide="chat-send"
@@ -187,13 +200,13 @@ export function ChatbotCompare({ hero }: { hero: HeroProfile | null }) {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder={hero ? `Ask about ${hero.name}…` : "Select a hero first"}
-            disabled={!hero}
+            disabled={!hero || (guideOn && !guideAllowsChatFreeSend(guideStep))}
             data-testid="chat-input"
-            className="min-h-11 flex-1 rounded-redis border border-redis-border-secondary bg-redis-bg-tertiary px-4 py-2 font-redis-body text-sm text-redis-text placeholder:text-redis-text-muted focus:border-redis-hyper focus:outline-none"
+            className="min-h-11 flex-1 rounded-redis border border-redis-border-secondary bg-redis-bg-tertiary px-4 py-2 font-redis-body text-sm text-redis-text placeholder:text-redis-text-muted focus:border-redis-hyper focus:outline-none disabled:cursor-not-allowed disabled:opacity-40"
           />
           <button
             type="submit"
-            disabled={!hero || !input.trim()}
+            disabled={!hero || !input.trim() || (guideOn && !guideAllowsChatFreeSend(guideStep))}
             data-testid="chat-ask-both"
             data-guide="chat-ask-both"
             className="min-h-11 rounded-redis border border-redis-border border-l-[4px] border-l-redis-hyper bg-redis-bg-tertiary px-5 font-redis-body text-sm font-semibold text-redis-text hover:bg-redis-border disabled:opacity-50"
