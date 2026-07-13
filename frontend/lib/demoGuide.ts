@@ -337,38 +337,45 @@ export const GUIDE_STEPS: GuideStep[] = [
   },
   {
     id: "alex-panels",
-    title: "Data points that exposed the fraud",
+    title: "Two panels caught the fraud",
     instruction:
-      "Two signals drove BLOCK: impossible travel in Feature Store, and a device Alex has never used. Each highlighted row is one reason the bank stopped the swipe.",
+      "Look at the two highlighted panels on the right — not Agent Memory (Alex has no travel note to explain Brazil).\n\n**Feature Store** — pre-computed risk signals on Alex's card.\n**Context Retriever** — live lookup showing Alex's MacBook is in the US while this swipe came from a new Android in Brazil.",
+    presenterLine:
+      "Card in Brazil, Alex in San Francisco — two independent signals, same conclusion.",
     redisBenefit:
       "Redis combines real-time features and live lookups — one source of truth for accurate fraud detection.",
     target: '[data-testid="iris-rail"]',
     hero: "alex",
     irisDiagram: "context-retriever",
     panelHints: {
-      featureStore: { focusTraceContains: "impossible-travel" },
+      featureStore: { focusTool: "get_geo_entropy" },
       contextRetriever: { focusTool: "get_devices_for_customer" },
     },
     panelDecode: [
       {
-        term: "geo_entropy ≈ 0.9",
+        term: "Feature Store · geo_entropy ≈ 0.9",
         meaning:
-          "Alex's card jumped countries unnaturally fast — US history, then Brazil within hours. High entropy = location chaos, a classic fraud signal.",
+          "Alex's card history is US-only, but this swipe is in Brazil — a sudden country jump the agent reads as location chaos, not a traveller on vacation.",
       },
       {
-        term: "Highlighted: impossible travel",
+        term: "Feature Store · new_device_24h = 1",
         meaning:
-          "Seattle activity this morning and São Paulo electronics now — physically implausible for one person.",
+          "The swipe came from a phone Redis has never seen on this card. A fraudster's device, not Alex's usual MacBook.",
       },
       {
-        term: "new_device_24h = 1",
+        term: "Feature Store · Look here row",
         meaning:
-          "The swipe came from a phone Alex has never used. Combined with the country jump, that's a strong block signal.",
+          "The highlighted trace line is get_geo_entropy — the agent explicitly checked whether locations look impossible before blocking.",
       },
       {
-        term: "get_devices_for_customer",
+        term: "Context Retriever · get_devices_for_customer",
         meaning:
-          "Lists devices tied to Alex. The highlighted row is the unfamiliar Android — not his usual MacBook.",
+          "Live device list: dev_alex_macbook (US, known 8+ months) vs dev_alex_unknown_android (BR, first seen today). Alex is in San Francisco; the card is being used in São Paulo.",
+      },
+      {
+        term: "Why not Agent Memory?",
+        meaning:
+          "Alex never told the bank he was travelling. Unlike Jane, there's no note to excuse a foreign swipe — so block is the right call.",
       },
     ],
     advance: { mode: "manual" },

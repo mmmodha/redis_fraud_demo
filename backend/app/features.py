@@ -11,7 +11,7 @@ import os
 import time
 from collections import deque
 from threading import Lock
-from typing import Deque, Optional
+from typing import Any, Deque, Optional
 
 import redis
 
@@ -113,5 +113,45 @@ def get_store() -> FeatureStore:
     return _store
 
 
-def get_features(card_id: str) -> dict:
+def pending_review_key(customer_id: str) -> str:
+    return f"pending_review:{customer_id}"
+
+
+def read_pending_review(client: redis.Redis, customer_id: str) -> Optional[dict[str, Any]]:
+    raw = client.json().get(pending_review_key(customer_id), "$")
+    if not raw:
+        return None
+    payload = raw[0] if isinstance(raw, list) else raw
+    return payload if isinstance(payload, dict) else None
+
+
+def overlay_pending_fraud_signals(features: dict, pending: Optional[dict[str, Any]]) -> dict:
+    """Adjust feat:* reads for in-flight swipes staged in pending_review.
+
+    Settled history for Alex is US-only (geo_entropy=0) until the Brazil
+    electronics attempt lands in the stream; the demo stages that swipe as
+    pending so presenters see the fraud signal on the Feature Store panel.
+    """
+    if not pending:
+        return features
+    out = dict(features)
+    if pending.get("impossible_travel") or pending.get("foreign_country"):
+        out["geo_entropy"] = max(float(out.get("geo_entropy", 0.0) or 0.0), 0.91)
+        out["impossible_travel"] = True
+    if pending.get("device_first_seen_today"):
+        out["new_device_24h"] = max(int(out.get("new_device_24h", 0) or 0), 1)
+    return out
+
+
+def get_features(card_id: str, *, customer_id: Optional[str] = None) -> dict:
+    store = get_store()
+    data = store.get_features(card_id)
+    if customer_id:
+        pending = read_pending_review(store._client, customer_id)
+        data = overlay_pending_fraud_signals(data, pending)
+    return data
+
+
+def get_features_raw(card_id: str) -> dict:
+    """HGETALL on feat:{card_id} without pending-review overlay."""
     return get_store().get_features(card_id)

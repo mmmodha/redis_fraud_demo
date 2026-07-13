@@ -4,8 +4,8 @@ import type { GuideStep } from "./demoGuide";
 export type GuidePanelHints = {
   /** Highlight the trace-strip pill for this component only. */
   traceStrip?: { focusComponent?: string };
-  /** Highlight the Feature Store trace line containing this text. */
-  featureStore?: { focusTraceContains?: string };
+  /** Highlight a Feature Store trace row by tool name and/or summary substring. */
+  featureStore?: { focusTool?: string; focusTraceContains?: string };
   /** Expand + Look here on this Context Retriever tool row only. */
   contextRetriever?: { focusTool?: string };
   /** Look here on memory summary and/or one JSON field key. */

@@ -255,3 +255,27 @@ def test_shannon_entropy_normalized_bounds():
     # Skewed distribution -> between 0 and 1
     val = feature_worker.shannon_entropy_normalized(["US"] * 9 + ["CA"])
     assert 0.0 < val < 1.0
+
+
+def test_pending_review_overlay_elevates_alex_geo_entropy():
+    from app import features as feat_mod
+
+    r = _fake_redis()
+    r.hset("feat:card_alex_visa", mapping={"geo_entropy": "0.0", "new_device_24h": "0"})
+    r.json().set(
+        "pending_review:cust_alex",
+        "$",
+        {
+            "foreign_country": True,
+            "impossible_travel": True,
+            "device_first_seen_today": True,
+        },
+    )
+    pending = feat_mod.read_pending_review(r, "cust_alex")
+    overlaid = feat_mod.overlay_pending_fraud_signals(
+        feat_mod._coerce(r.hgetall("feat:card_alex_visa")),
+        pending,
+    )
+    assert overlaid["geo_entropy"] >= 0.91
+    assert overlaid["new_device_24h"] == 1
+    assert overlaid["impossible_travel"] is True

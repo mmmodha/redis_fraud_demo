@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getFeatures } from "@/lib/api";
 import type { HeroProfile, TraceStep } from "@/lib/types";
 import { IrisPanel, EmptyPanelState } from "../IrisPanel";
@@ -14,28 +14,33 @@ export function FeatureStorePanel({
   steps: TraceStep[];
 }) {
   const { guideMode, hints } = useGuidePanelHints();
+  const focusTool = guideMode ? hints?.featureStore?.focusTool : undefined;
   const focusTrace = guideMode ? hints?.featureStore?.focusTraceContains : undefined;
-  const [fallback, setFallback] = useState<Record<string, unknown> | null>(null);
+  const [liveFeatures, setLiveFeatures] = useState<Record<string, unknown> | null>(null);
 
   const fsSteps = steps.filter((s) => s.component === "feature_store");
 
   useEffect(() => {
     let cancelled = false;
-    setFallback(null);
+    setLiveFeatures(null);
     if (!hero) return;
-    if (fsSteps.length > 0) return;
     async function load() {
-      const f = await getFeatures(hero!.card_id);
-      if (!cancelled) setFallback(f);
+      const f = await getFeatures(hero!.card_id, hero!.customer_id);
+      if (!cancelled) setLiveFeatures(f);
     }
     load();
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hero?.card_id, fsSteps.length]);
+  }, [hero?.card_id, hero?.customer_id, fsSteps.length]);
 
-  const features = fsSteps[0]?.output_data ?? fallback ?? null;
+  const features = useMemo(
+    () => mergeFeatureDisplay(liveFeatures, fsSteps),
+    [liveFeatures, fsSteps],
+  );
+
+  const scorecardSource =
+    liveFeatures != null ? "Live scorecard" : fsSteps.length > 0 ? "From trace" : "Idle";
 
   return (
     <IrisPanel
@@ -43,7 +48,7 @@ export function FeatureStorePanel({
       component="feature_store"
       guideTarget="panel-feature-store"
       subtitle={hero ? `card:${hero.card_id}` : "no card selected"}
-      badge={fsSteps.length > 0 ? "From trace" : fallback ? "Live fetch" : "Idle"}
+      badge={fsSteps.length > 0 ? `${scorecardSource} · ${fsSteps.length} call${fsSteps.length === 1 ? "" : "s"}` : scorecardSource}
       active={fsSteps.length > 0}
     >
       {!hero ? (
@@ -68,8 +73,9 @@ export function FeatureStorePanel({
         <div className="mt-3 font-redis-mono text-[11px] text-redis-text-secondary">
           {fsSteps.map((s, i) => {
             const isFocus =
-              focusTrace != null &&
-              s.output_summary.toLowerCase().includes(focusTrace.toLowerCase());
+              (focusTool != null && s.tool === focusTool) ||
+              (focusTrace != null &&
+                s.output_summary.toLowerCase().includes(focusTrace.toLowerCase()));
             return (
               <div
                 key={`${s.tool}-${i}`}
@@ -96,6 +102,34 @@ export function FeatureStorePanel({
       )}
     </IrisPanel>
   );
+}
+
+function mergeFeatureDisplay(
+  live: Record<string, unknown> | null,
+  fsSteps: TraceStep[],
+): Record<string, unknown> | null {
+  const merged: Record<string, unknown> = live ? { ...live } : {};
+
+  for (const step of fsSteps) {
+    if (!step.output_data || typeof step.output_data !== "object") continue;
+    const data = step.output_data as Record<string, unknown>;
+    if (step.tool === "get_geo_entropy") {
+      if (data.geo_entropy != null) merged.geo_entropy = data.geo_entropy;
+      else if (data.entropy != null) merged.geo_entropy = data.entropy;
+      if (data.impossible_travel != null) merged.impossible_travel = data.impossible_travel;
+    }
+    if (step.tool === "get_new_device_flag" && data.new_device_24h != null) {
+      merged.new_device_24h = data.new_device_24h === true ? 1 : data.new_device_24h;
+    }
+    if (step.tool === "get_velocity_features") {
+      for (const [k, v] of Object.entries(data)) {
+        if (v != null) merged[k] = v;
+      }
+    }
+  }
+
+  if (Object.keys(merged).length === 0) return null;
+  return merged;
 }
 
 function formatValue(v: unknown): string {
