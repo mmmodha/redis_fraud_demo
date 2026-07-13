@@ -9,34 +9,21 @@ test.describe("Guide mode", () => {
     await expect(page.getByText("Welcome to the Fraud Command Center")).toBeVisible();
   });
 
-  test("continue advances to meet Mike and selects Mike", async ({ page }) => {
+  test("continue advances to Mike scenario step and selects Mike", async ({ page }) => {
     await page.goto("/");
     await page.getByTestId("guide-mode-toggle").click();
     await page.getByTestId("guide-continue").click();
     await expect(page.getByText("Meet Mike — everyday spending")).toBeVisible();
     await expect(page.locator('[data-guide="hero-mike"]')).toHaveAttribute("data-active", "true");
+    await expect(page.getByTestId("guide-run-hero")).toBeVisible();
   });
 
-  test("meet step blocks hero run before run step", async ({ page }) => {
-    await page.goto("/");
-    await page.getByTestId("guide-mode-toggle").click();
-    await page.getByTestId("guide-continue").click(); // welcome → meet Mike
-
-    await expect(page.getByText("Meet Mike — everyday spending")).toBeVisible();
-    await expect(page.getByTestId("run-mike")).toHaveCount(0);
-    await expect(page.getByTestId("hero-run-hidden-mike")).toContainText(
-      "next step",
-    );
-    await expect(page.getByTestId("guide-run-hero")).toHaveCount(0);
-  });
-
-  test("run step hides hero card Run and advances only after score completes", async ({
+  test("Mike scenario step hides card Run and advances only after score completes", async ({
     page,
   }) => {
     await page.goto("/");
     await page.getByTestId("guide-mode-toggle").click();
-    await page.getByTestId("guide-continue").click(); // welcome → meet Mike
-    await page.getByTestId("guide-continue").click(); // meet Mike → run step
+    await page.getByTestId("guide-continue").click(); // welcome → Mike read + run
 
     await expect(page.getByTestId("hero-run-hidden-mike")).toBeVisible();
     await expect(page.getByTestId("run-mike")).toHaveCount(0);
@@ -56,7 +43,6 @@ test.describe("Guide mode", () => {
     await page.goto("/");
     await page.getByTestId("guide-mode-toggle").click();
     await page.getByTestId("guide-continue").click();
-    await page.getByTestId("guide-continue").click();
 
     const runBtn = page.getByTestId("guide-run-hero");
     await expect(runBtn).toBeVisible();
@@ -69,15 +55,14 @@ test.describe("Guide mode", () => {
   }) => {
     await page.goto("/");
     await page.getByTestId("guide-mode-toggle").click();
-    await page.getByTestId("guide-continue").click(); // welcome → meet Mike
-    await page.getByTestId("guide-continue").click(); // meet → run
+    await page.getByTestId("guide-continue").click(); // welcome → Mike
     await page.getByTestId("guide-run-hero").click();
     await expect(page.getByText("The verdict — fast and confident")).toBeVisible({
       timeout: 15000,
     });
 
     await page.getByTestId("guide-back").click();
-    await expect(page.getByText("Run Mike's scenario")).toBeVisible();
+    await expect(page.getByText("Meet Mike — everyday spending")).toBeVisible();
     await expect(page.getByTestId("guide-run-hero")).toHaveText("Run again");
     await page.getByTestId("guide-continue").click();
     await expect(page.getByText("The verdict — fast and confident")).toBeVisible();
