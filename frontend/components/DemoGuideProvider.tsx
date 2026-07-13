@@ -13,6 +13,7 @@ import {
 import {
   GUIDE_STEPS,
   eventsMatch,
+  guideAllowsHeroRun,
   type GuideEvent,
   type GuideStep,
   type HeroKey,
@@ -65,6 +66,7 @@ export function DemoGuideProvider({ children }: { children: ReactNode }) {
   const insertChatRef = useRef<InsertChatFn | null>(null);
   const prevStepIdRef = useRef<string | null>(null);
   const prevStepHeroRef = useRef<HeroKey | undefined>(undefined);
+  const autoSkipCheckedRef = useRef<string | null>(null);
 
   useEffect(() => {
     try {
@@ -95,6 +97,7 @@ export function DemoGuideProvider({ children }: { children: ReactNode }) {
       setIsChatLoading(false);
       prevStepIdRef.current = null;
       prevStepHeroRef.current = undefined;
+      autoSkipCheckedRef.current = null;
     }
   }, []);
 
@@ -130,6 +133,7 @@ export function DemoGuideProvider({ children }: { children: ReactNode }) {
     setIsChatLoading(false);
     prevStepIdRef.current = null;
     prevStepHeroRef.current = undefined;
+    autoSkipCheckedRef.current = null;
   }, []);
 
   const registerRunHero = useCallback((fn: RunHeroFn) => {
@@ -145,8 +149,10 @@ export function DemoGuideProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const runHeroForGuide = useCallback((heroKey: HeroKey) => {
+    const step = GUIDE_STEPS[currentStepIndex];
+    if (!guideAllowsHeroRun(step ?? null, heroKey)) return;
     runHeroRef.current?.(heroKey);
-  }, []);
+  }, [currentStepIndex]);
 
   const insertChatMessage = useCallback((text: string) => {
     insertChatRef.current?.(text);
@@ -178,6 +184,32 @@ export function DemoGuideProvider({ children }: { children: ReactNode }) {
       selectHeroRef.current?.(currentStep.hero);
     }
   }, [guideMode, currentStep]);
+
+  // Skip redundant run / cache-replay steps when entering a step whose action is already done.
+  useEffect(() => {
+    if (!guideMode || !currentStep) return;
+    if (autoSkipCheckedRef.current === currentStep.id) return;
+    autoSkipCheckedRef.current = currentStep.id;
+
+    if (
+      currentStep.suggestedAction === "run-hero" &&
+      currentStep.hero &&
+      scoreReadyForHero === currentStep.hero
+    ) {
+      const t = setTimeout(advance, 400);
+      return () => clearTimeout(t);
+    }
+
+    if (
+      currentStep.advance.mode === "event" &&
+      currentStep.advance.event.type === "hero-cache-hit" &&
+      currentStep.hero &&
+      cacheHitForHero === currentStep.hero
+    ) {
+      const t = setTimeout(advance, 400);
+      return () => clearTimeout(t);
+    }
+  }, [guideMode, currentStep, scoreReadyForHero, cacheHitForHero, advance]);
 
   const value = useMemo(
     (): DemoGuideContextValue => ({

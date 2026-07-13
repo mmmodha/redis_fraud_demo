@@ -153,11 +153,21 @@ export const GUIDE_STEPS: GuideStep[] = [
 
   // ── Jane — focused ─────────────────────────────────────────────────────
   {
-    id: "jane-run",
+    id: "jane-meet",
     title: "Jane — the $1,820 question",
     instruction:
-      "Luxury boutique in Singapore — foreign country, high amount. Read Jane's card, make your call (approve, verify with OTP, or block), then click **Run scenario** in this panel.",
+      "Luxury boutique in Singapore — foreign country, high amount. Read Jane's scenario on her card — what would you call it: approve, verify with OTP, or block?",
     presenterLine: "What do you think? Approve, verify with OTP, or block?",
+    hero: "jane",
+    target: '[data-guide="hero-jane"]',
+    activateHero: "jane",
+    advance: { mode: "manual" },
+  },
+  {
+    id: "jane-run",
+    title: "Run Jane's scenario",
+    instruction:
+      'Click **Run scenario** in this panel. Watch whether Redis approves despite the risky-looking signals.',
     hero: "jane",
     target: '[data-guide="hero-jane"]',
     suggestedAction: "run-hero",
@@ -281,11 +291,21 @@ export const GUIDE_STEPS: GuideStep[] = [
 
   // ── Alex — focused ─────────────────────────────────────────────────────
   {
-    id: "alex-run",
+    id: "alex-meet",
     title: "Alex — wrong device, wrong continent",
     instruction:
-      "Electronics in São Paulo — read Alex's bio and scenario first. Make your call, then click **Run scenario** in this panel and see what Redis decides.",
+      "Electronics in São Paulo — read Alex's bio and scenario on his card. What would you call it: approve, verify with OTP, or block?",
     presenterLine: "What do you think? Approve, verify with OTP, or block?",
+    hero: "alex",
+    target: '[data-guide="hero-alex"]',
+    activateHero: "alex",
+    advance: { mode: "manual" },
+  },
+  {
+    id: "alex-run",
+    title: "Run Alex's scenario",
+    instruction:
+      'Click **Run scenario** in this panel and see what Redis decides.',
     hero: "alex",
     target: '[data-guide="hero-alex"]',
     suggestedAction: "run-hero",
@@ -321,11 +341,21 @@ export const GUIDE_STEPS: GuideStep[] = [
 
   // ── Sarah — focused ────────────────────────────────────────────────────
   {
-    id: "sarah-run",
+    id: "sarah-meet",
     title: "Sarah — the split decision",
     instruction:
-      "Tiffany & Co in Manhattan for $1,450 — friendly profile, high value, away from home. Make your call, then click **Run scenario** in this panel.",
+      "Tiffany & Co in Manhattan for $1,450 — friendly profile, high value, away from home. Read Sarah's scenario — what would you call it: approve, verify with OTP, or block?",
     presenterLine: "What do you think? Approve, verify with OTP, or block?",
+    hero: "sarah",
+    target: '[data-guide="hero-sarah"]',
+    activateHero: "sarah",
+    advance: { mode: "manual" },
+  },
+  {
+    id: "sarah-run",
+    title: "Run Sarah's scenario",
+    instruction:
+      'Click **Run scenario** in this panel. Watch for Review Required and the OTP confirmation flow.',
     hero: "sarah",
     target: '[data-guide="hero-sarah"]',
     suggestedAction: "run-hero",
@@ -421,4 +451,26 @@ export function isGuideRunStepForHero(
   heroKey: HeroKey,
 ): boolean {
   return step?.suggestedAction === "run-hero" && step.hero === heroKey;
+}
+
+/** Card Run is guide-panel only on the designated run step for that hero. */
+export function guideAllowsHeroRun(
+  step: GuideStep | null,
+  heroKey: HeroKey,
+): boolean {
+  return isGuideRunStepForHero(step, heroKey);
+}
+
+export function guideAllowsChatPrompt(
+  step: GuideStep | null,
+  index: number,
+): boolean {
+  if (!step || step.advance.mode !== "event") return false;
+  const ev = step.advance.event;
+  return ev.type === "chat-prompt" && ev.index === index;
+}
+
+/** Freeform chat input + Ask both — only on the LangCache typing step. */
+export function guideAllowsChatFreeSend(step: GuideStep | null): boolean {
+  return step?.suggestedAction === "type-message";
 }
