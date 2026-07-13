@@ -142,3 +142,29 @@ async def test_get_pending_review_returns_null_when_none(backends):
     assert out is None
     assert step.output_summary == "no pending review"
     assert step.output_data == {"customer_id": "cust_mike", "pending": None}
+
+
+# ---------- get_geo_entropy + pending review --------------------------------
+
+
+async def test_get_geo_entropy_elevates_for_alex_pending_review(client, backends):
+    """US-only feat hash + staged Brazil swipe must not read as geo_entropy=0."""
+    client.hset("feat:card_alex_visa", mapping={"geo_entropy": "0.0", "new_device_24h": "0"})
+    client.json().set(
+        "pending_review:cust_alex",
+        "$",
+        {
+            "customer_id": "cust_alex",
+            "merchant_country": "BR",
+            "foreign_country": True,
+            "impossible_travel": True,
+        },
+    )
+    out, step = await call_tool(
+        "get_geo_entropy", {"customer_id": "cust_alex"}, backends=backends,
+    )
+    assert out["geo_entropy"] >= 0.91
+    assert out["impossible_travel"] is True
+    assert "impossible-travel" in step.output_summary
+    assert step.component == "feature_store"
+    assert step.tool == "get_geo_entropy"

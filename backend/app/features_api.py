@@ -23,9 +23,9 @@ def health_features() -> dict:
 
 
 @router.get("/debug/features/{card_id}")
-def debug_features(card_id: str) -> dict:
+def debug_features(card_id: str, customer_id: str | None = None) -> dict:
     try:
-        data = features.get_features(card_id)
+        data = features.get_features(card_id, customer_id=customer_id)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc))
-    return {"card_id": card_id, "features": data}
+    return {"card_id": card_id, "customer_id": customer_id, "features": data}

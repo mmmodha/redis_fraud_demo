@@ -191,10 +191,15 @@ export async function clearDemoCache(
   );
 }
 
-export async function getFeatures(cardId: string, signal?: AbortSignal): Promise<Record<string, unknown> | null> {
+export async function getFeatures(
+  cardId: string,
+  customerId?: string,
+  signal?: AbortSignal,
+): Promise<Record<string, unknown> | null> {
   try {
+    const qs = customerId ? `?customer_id=${encodeURIComponent(customerId)}` : "";
     const r = await getJSON<{ card_id: string; features: Record<string, unknown> }>(
-      `/debug/features/${encodeURIComponent(cardId)}`,
+      `/debug/features/${encodeURIComponent(cardId)}${qs}`,
       signal,
     );
     return r.features;

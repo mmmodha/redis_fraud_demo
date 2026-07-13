@@ -430,6 +430,10 @@ async def _get_disputes(backends: Backends, args: dict) -> tuple[Any, TraceStep]
     )
 
 
+def _read_pending_review(client: redis.Redis, customer_id: str) -> Optional[dict[str, Any]]:
+    return feature_store.read_pending_review(client, customer_id)
+
+
 async def _get_pending_review(backends: Backends, args: dict) -> tuple[Any, TraceStep]:
     # Reads ``pending_review:{customer_id}`` JSON staging record. Returns
     # ``null`` when no transaction is currently queued for review.
@@ -486,19 +490,27 @@ async def _get_geo_entropy(backends: Backends, args: dict) -> tuple[Any, TraceSt
     client: redis.Redis = _need(backends.redis_client, "redis_client", "get_geo_entropy")
     customer_id = args["customer_id"]
     card_id = _resolve_card_id(backends, customer_id, args.get("card_id"))
-    store = feature_store.FeatureStore(client)
     start = time.perf_counter()
-    data = store.get_features(card_id)
+    data = feature_store.get_features(card_id, customer_id=customer_id)
     latency_ms = int((time.perf_counter() - start) * 1000)
     entropy = float(data.get("geo_entropy", 0.0) or 0.0)
-    out = {"customer_id": customer_id, "card_id": card_id, "geo_entropy": entropy}
+    impossible_travel = bool(data.get("impossible_travel"))
+    out = {
+        "customer_id": customer_id,
+        "card_id": card_id,
+        "geo_entropy": entropy,
+        "impossible_travel": impossible_travel,
+    }
+    summary = f"geo_entropy={entropy:.3f}"
+    if impossible_travel:
+        summary += " — impossible-travel pattern"
     return out, _trace(
         component="feature_store", tool="get_geo_entropy",
         inp={"customer_id": customer_id, "card_id": card_id},
-        summary=f"geo_entropy={entropy:.3f}",
+        summary=summary,
         data=out,
         latency_ms=latency_ms,
-        keys=[feature_store.feat_key(card_id)],
+        keys=[feature_store.feat_key(card_id), _pending_review_key(customer_id)],
     )
 
 
@@ -507,9 +519,8 @@ async def _get_new_device_flag(backends: Backends, args: dict) -> tuple[Any, Tra
     customer_id = args["customer_id"]
     device_id = args["device_id"]
     card_id = _resolve_card_id(backends, customer_id, args.get("card_id"))
-    store = feature_store.FeatureStore(client)
     start = time.perf_counter()
-    data = store.get_features(card_id)
+    data = feature_store.get_features(card_id, customer_id=customer_id)
     # The feature worker writes a 24h "new device" boolean (0/1) per card,
     # plus a side hash feat:_dev:{card_id} containing first_seen_ts per device.
     new_24h = int(data.get("new_device_24h", 0) or 0)
