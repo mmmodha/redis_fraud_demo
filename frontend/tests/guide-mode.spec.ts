@@ -64,6 +64,25 @@ test.describe("Guide mode", () => {
     await expect(runBtn).not.toHaveClass(/border-redis-hyper/);
   });
 
+  test("back navigates to previous step and allows continue without re-run", async ({
+    page,
+  }) => {
+    await page.goto("/");
+    await page.getByTestId("guide-mode-toggle").click();
+    await page.getByTestId("guide-continue").click(); // welcome → meet Mike
+    await page.getByTestId("guide-continue").click(); // meet → run
+    await page.getByTestId("guide-run-hero").click();
+    await expect(page.getByText("The verdict — fast and confident")).toBeVisible({
+      timeout: 15000,
+    });
+
+    await page.getByTestId("guide-back").click();
+    await expect(page.getByText("Run Mike's scenario")).toBeVisible();
+    await expect(page.getByTestId("guide-run-hero")).toHaveText("Run again");
+    await page.getByTestId("guide-continue").click();
+    await expect(page.getByText("The verdict — fast and confident")).toBeVisible();
+  });
+
   test("clipboard helper falls back when navigator.clipboard rejects", async ({
     page,
   }) => {

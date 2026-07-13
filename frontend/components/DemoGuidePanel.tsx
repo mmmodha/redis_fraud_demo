@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useDemoGuide } from "./DemoGuideProvider";
 import { GuideIrisDiagram } from "./GuideIrisDiagram";
-import { GUIDE_STEPS, type HeroKey } from "@/lib/demoGuide";
+import { GUIDE_STEPS, isGuideCacheReplayStep, isGuideHeroRunEventStep, type HeroKey } from "@/lib/demoGuide";
 import { copyToClipboard } from "@/lib/clipboard";
 
 export function DemoGuidePanel() {
@@ -13,6 +13,7 @@ export function DemoGuidePanel() {
     currentStep,
     currentStepIndex,
     continueStep,
+    goBackStep,
     skipStep,
     resetGuide,
     runHeroForGuide,
@@ -45,8 +46,18 @@ export function DemoGuidePanel() {
     !requiresCacheHit || (step.hero != null && cacheHitForHero === step.hero);
 
   const scoringActive = isScoringHero != null;
+  const runStepComplete =
+    isGuideHeroRunEventStep(step) &&
+    step.hero != null &&
+    scoreReadyForHero === step.hero;
+  const cacheReplayComplete =
+    isGuideCacheReplayStep(step) &&
+    step.hero != null &&
+    cacheHitForHero === step.hero;
   const canContinue =
-    isManual && scoreReady && otpReady && cacheReady && !scoringActive;
+    (isManual && scoreReady && otpReady && cacheReady && !scoringActive) ||
+    runStepComplete ||
+    cacheReplayComplete;
 
   const thinkingMessage = scoringActive
     ? "Running scenario — Redis is assembling context…"
@@ -198,7 +209,11 @@ export function DemoGuidePanel() {
             disabled={scoringActive}
             className="w-full rounded-redis bg-redis-hyper px-3 py-2.5 font-redis-body text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
           >
-            {scoringActive ? "Running scenario…" : "Run scenario"}
+            {scoringActive
+              ? "Running scenario…"
+              : runStepComplete || cacheReplayComplete
+                ? "Run again"
+                : "Run scenario"}
           </button>
         )}
 
@@ -219,12 +234,22 @@ export function DemoGuidePanel() {
               onClick={continueStep}
               className="w-full rounded-redis bg-redis-hyper px-3 py-2.5 font-redis-body text-sm font-semibold text-white hover:opacity-90"
             >
-              Continue
+              {runStepComplete || cacheReplayComplete ? "Continue without re-running" : "Continue"}
             </button>
           )
         )}
 
         <div className="flex gap-2">
+          {currentStepIndex > 0 && (
+            <button
+              type="button"
+              data-testid="guide-back"
+              onClick={goBackStep}
+              className="flex-1 rounded-redis border border-redis-border bg-redis-bg-tertiary px-3 py-2 font-redis-body text-xs font-semibold text-redis-text-secondary hover:bg-redis-border"
+            >
+              Back
+            </button>
+          )}
           {step.suggestedAction !== "close-guide" && (
             <button
               type="button"

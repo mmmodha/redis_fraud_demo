@@ -474,3 +474,18 @@ export function guideAllowsChatPrompt(
 export function guideAllowsChatFreeSend(step: GuideStep | null): boolean {
   return step?.suggestedAction === "type-message";
 }
+
+export function isGuideHeroRunEventStep(step: GuideStep | null): boolean {
+  return (
+    step?.suggestedAction === "run-hero" &&
+    step.advance.mode === "event" &&
+    step.advance.event.type === "hero-run"
+  );
+}
+
+export function isGuideCacheReplayStep(step: GuideStep | null): boolean {
+  return (
+    step?.advance.mode === "event" &&
+    step.advance.event.type === "hero-cache-hit"
+  );
+}
