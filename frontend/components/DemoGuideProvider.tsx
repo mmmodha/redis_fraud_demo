@@ -22,6 +22,7 @@ const STORAGE_KEY = "fcc-guide-mode";
 
 type RunHeroFn = (heroKey: HeroKey) => void;
 type SelectHeroFn = (heroKey: HeroKey) => void;
+type InsertChatFn = (text: string) => void;
 
 type DemoGuideContextValue = {
   guideMode: boolean;
@@ -34,13 +35,19 @@ type DemoGuideContextValue = {
   resetGuide: () => void;
   registerRunHero: (fn: RunHeroFn) => void;
   registerSelectHero: (fn: SelectHeroFn) => void;
+  registerInsertChat: (fn: InsertChatFn) => void;
   runHeroForGuide: (heroKey: HeroKey) => void;
+  insertChatMessage: (text: string) => void;
   scoreReadyForHero: HeroKey | null;
   setScoreReadyForHero: (hero: HeroKey | null) => void;
   cacheHitForHero: HeroKey | null;
   setCacheHitForHero: (hero: HeroKey | null) => void;
   otpConfirmedForSarah: boolean;
   setOtpConfirmedForSarah: (v: boolean) => void;
+  isScoringHero: HeroKey | null;
+  setIsScoringHero: (hero: HeroKey | null) => void;
+  isChatLoading: boolean;
+  setIsChatLoading: (v: boolean) => void;
 };
 
 const DemoGuideContext = createContext<DemoGuideContextValue | null>(null);
@@ -51,9 +58,13 @@ export function DemoGuideProvider({ children }: { children: ReactNode }) {
   const [scoreReadyForHero, setScoreReadyForHero] = useState<HeroKey | null>(null);
   const [cacheHitForHero, setCacheHitForHero] = useState<HeroKey | null>(null);
   const [otpConfirmedForSarah, setOtpConfirmedForSarah] = useState(false);
+  const [isScoringHero, setIsScoringHero] = useState<HeroKey | null>(null);
+  const [isChatLoading, setIsChatLoading] = useState(false);
   const runHeroRef = useRef<RunHeroFn | null>(null);
   const selectHeroRef = useRef<SelectHeroFn | null>(null);
+  const insertChatRef = useRef<InsertChatFn | null>(null);
   const prevStepIdRef = useRef<string | null>(null);
+  const prevStepHeroRef = useRef<HeroKey | undefined>(undefined);
 
   useEffect(() => {
     try {
@@ -80,7 +91,10 @@ export function DemoGuideProvider({ children }: { children: ReactNode }) {
       setScoreReadyForHero(null);
       setCacheHitForHero(null);
       setOtpConfirmedForSarah(false);
+      setIsScoringHero(null);
+      setIsChatLoading(false);
       prevStepIdRef.current = null;
+      prevStepHeroRef.current = undefined;
     }
   }, []);
 
@@ -112,7 +126,10 @@ export function DemoGuideProvider({ children }: { children: ReactNode }) {
     setScoreReadyForHero(null);
     setCacheHitForHero(null);
     setOtpConfirmedForSarah(false);
+    setIsScoringHero(null);
+    setIsChatLoading(false);
     prevStepIdRef.current = null;
+    prevStepHeroRef.current = undefined;
   }, []);
 
   const registerRunHero = useCallback((fn: RunHeroFn) => {
@@ -123,17 +140,34 @@ export function DemoGuideProvider({ children }: { children: ReactNode }) {
     selectHeroRef.current = fn;
   }, []);
 
+  const registerInsertChat = useCallback((fn: InsertChatFn) => {
+    insertChatRef.current = fn;
+  }, []);
+
   const runHeroForGuide = useCallback((heroKey: HeroKey) => {
     runHeroRef.current?.(heroKey);
   }, []);
 
+  const insertChatMessage = useCallback((text: string) => {
+    insertChatRef.current?.(text);
+  }, []);
+
   const currentStep = guideMode ? GUIDE_STEPS[currentStepIndex] ?? null : null;
 
-  // Activate hero when step changes (bootstrap + chatbot intro).
+  // Activate hero and reset stale gates when step changes.
   useEffect(() => {
     if (!guideMode || !currentStep) return;
     if (currentStep.id === prevStepIdRef.current) return;
+
+    const prevHero = prevStepHeroRef.current;
     prevStepIdRef.current = currentStep.id;
+    prevStepHeroRef.current = currentStep.hero;
+
+    if (currentStep.hero != null && prevHero != null && currentStep.hero !== prevHero) {
+      setScoreReadyForHero(null);
+      setCacheHitForHero(null);
+      if (currentStep.hero !== "sarah") setOtpConfirmedForSarah(false);
+    }
 
     if (currentStep.activateHero) {
       selectHeroRef.current?.(currentStep.activateHero);
@@ -157,13 +191,19 @@ export function DemoGuideProvider({ children }: { children: ReactNode }) {
       resetGuide,
       registerRunHero,
       registerSelectHero,
+      registerInsertChat,
       runHeroForGuide,
+      insertChatMessage,
       scoreReadyForHero,
       setScoreReadyForHero,
       cacheHitForHero,
       setCacheHitForHero,
       otpConfirmedForSarah,
       setOtpConfirmedForSarah,
+      isScoringHero,
+      setIsScoringHero,
+      isChatLoading,
+      setIsChatLoading,
     }),
     [
       guideMode,
@@ -176,10 +216,14 @@ export function DemoGuideProvider({ children }: { children: ReactNode }) {
       resetGuide,
       registerRunHero,
       registerSelectHero,
+      registerInsertChat,
       runHeroForGuide,
+      insertChatMessage,
       scoreReadyForHero,
       otpConfirmedForSarah,
       cacheHitForHero,
+      isScoringHero,
+      isChatLoading,
     ],
   );
 

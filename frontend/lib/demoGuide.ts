@@ -57,8 +57,8 @@ export const GUIDE_STEPS: GuideStep[] = [
     id: "meet-mike",
     title: "Meet Mike — everyday spending",
     instruction:
-      "Mike buys a $6.75 coffee in Austin. Read the scenario on his card — what would you call it: approve, step-up, or block?",
-    presenterLine: "What do you think? Approve, step-up, or block?",
+      "Mike buys a $6.75 coffee in Austin. Read the scenario on his card — what would you call it: approve, verify with OTP, or block?",
+    presenterLine: "What do you think? Approve, verify with OTP, or block?",
     target: '[data-guide="hero-mike"]',
     hero: "mike",
     activateHero: "mike",
@@ -70,9 +70,9 @@ export const GUIDE_STEPS: GuideStep[] = [
     id: "mike-run",
     title: "Run Mike's scenario",
     instruction:
-      'Click "Run scenario" on Mike (or use the button below). Watch the verdict appear — then we\'ll walk through why Redis decided that way.',
+      'Click **Run scenario** in this panel. Watch the verdict appear — then we\'ll walk through why Redis decided that way.',
     hero: "mike",
-    target: '[data-guide="hero-run-mike"]',
+    target: '[data-guide="hero-mike"]',
     suggestedAction: "run-hero",
     advance: { mode: "event", event: { type: "hero-run", hero: "mike" } },
   },
@@ -156,8 +156,8 @@ export const GUIDE_STEPS: GuideStep[] = [
     id: "jane-run",
     title: "Jane — the $1,820 question",
     instruction:
-      "Luxury boutique in Singapore — foreign country, high amount. Read Jane's card, make your call (approve, step-up, or block), then run the scenario.",
-    presenterLine: "What do you think? Approve, step-up, or block?",
+      "Luxury boutique in Singapore — foreign country, high amount. Read Jane's card, make your call (approve, verify with OTP, or block), then click **Run scenario** in this panel.",
+    presenterLine: "What do you think? Approve, verify with OTP, or block?",
     hero: "jane",
     target: '[data-guide="hero-jane"]',
     suggestedAction: "run-hero",
@@ -227,7 +227,7 @@ export const GUIDE_STEPS: GuideStep[] = [
     id: "chat-langcache-type",
     title: "LangCache — skip repeat work",
     instruction:
-      'Copy the question below into the chat box, then press Enter or click "Ask both" to send. LangCache recognises paraphrases — the LLM does not need to run again.',
+      'Copy the question below into the chat box (or use **Insert into chat**), then press Enter or click "Ask both" to send. LangCache recognises paraphrases — the LLM does not need to run again.',
     suggestedAction: "type-message",
     suggestedText: "Do they have travel planned?",
     target: '[data-guide="chat-send"]',
@@ -250,10 +250,10 @@ export const GUIDE_STEPS: GuideStep[] = [
     id: "jane-rerun",
     title: "LangCache on fraud scoring too",
     instruction:
-      'Re-run Jane\'s scenario (click "Run scenario" or use the button below). Same inputs — watch whether the second run feels different on the verdict card.',
+      'Click **Run scenario** in this panel to re-run Jane. Same inputs — watch whether the second run feels different on the verdict card.',
     presenterLine: "Same question, second time — what changed?",
     hero: "jane",
-    target: '[data-guide="hero-run-jane"]',
+    target: '[data-guide="hero-jane"]',
     suggestedAction: "run-hero",
     advance: { mode: "event", event: { type: "hero-cache-hit", hero: "jane" } },
   },
@@ -284,8 +284,8 @@ export const GUIDE_STEPS: GuideStep[] = [
     id: "alex-run",
     title: "Alex — wrong device, wrong continent",
     instruction:
-      "Electronics in São Paulo — read Alex's bio and scenario first. Make your call, then run the scenario and see what Redis decides.",
-    presenterLine: "What do you think? Approve, step-up, or block?",
+      "Electronics in São Paulo — read Alex's bio and scenario first. Make your call, then click **Run scenario** in this panel and see what Redis decides.",
+    presenterLine: "What do you think? Approve, verify with OTP, or block?",
     hero: "alex",
     target: '[data-guide="hero-alex"]',
     suggestedAction: "run-hero",
@@ -324,8 +324,8 @@ export const GUIDE_STEPS: GuideStep[] = [
     id: "sarah-run",
     title: "Sarah — the split decision",
     instruction:
-      "Tiffany & Co in Manhattan for $1,450 — friendly profile, high value, away from home. Make your call before you run Sarah's scenario.",
-    presenterLine: "What do you think? Approve, step-up, or block?",
+      "Tiffany & Co in Manhattan for $1,450 — friendly profile, high value, away from home. Make your call, then click **Run scenario** in this panel.",
+    presenterLine: "What do you think? Approve, verify with OTP, or block?",
     hero: "sarah",
     target: '[data-guide="hero-sarah"]',
     suggestedAction: "run-hero",
@@ -333,22 +333,22 @@ export const GUIDE_STEPS: GuideStep[] = [
   },
   {
     id: "sarah-breadcrumb",
-    title: "Step-up — confirm without blocking",
+    title: "Verify identity (OTP) — confirm without blocking",
     instruction:
-      "REVIEW first, then OTP confirmed, then APPROVED. Wait for the OTP step before continuing. This protects the customer without killing the sale.",
+      "REVIEW first, then OTP confirmed, then APPROVED. The bank texts a one-time code to confirm it's really Sarah before approving the purchase. Wait for the OTP step before continuing. This protects the customer without killing the sale.",
     presenterLine:
       "Confirm it's really Sarah — don't block her at the register.",
     redisBenefit:
-      "Redis gives enough context to choose step-up over block: trusted device, travel noted, but spend is unusually high.",
+      "Redis gives enough context to verify identity instead of blocking: trusted device, travel noted, but spend is unusually high.",
     target: '[data-guide="verdict-card"]',
     hero: "sarah",
     advance: { mode: "manual", requiresOtp: true },
   },
   {
     id: "sarah-panels",
-    title: "Why step-up was the right call",
+    title: "Why OTP verification was the right call",
     instruction:
-      "Sarah is travelling (memory note) but the spend is ~5× her norm (Feature Store). That combination is why Redis chose step-up instead of block or auto-approve.",
+      "Sarah is travelling (memory note) but the spend is ~5× her norm (Feature Store). That combination is why Redis chose verify identity instead of block or auto-approve.",
     redisBenefit:
       "Rich data points help the bank avoid both fraud losses and unnecessary blocks — the customer keeps shopping.",
     target: '[data-testid="iris-rail"]',
@@ -414,4 +414,11 @@ export function eventsMatch(step: GuideStep, event: GuideEvent): boolean {
 export function stepExpectsEvent(step: GuideStep | null, eventType: GuideEvent["type"]): boolean {
   if (!step || step.advance.mode !== "event") return false;
   return step.advance.event.type === eventType;
+}
+
+export function isGuideRunStepForHero(
+  step: GuideStep | null,
+  heroKey: HeroKey,
+): boolean {
+  return step?.suggestedAction === "run-hero" && step.hero === heroKey;
 }

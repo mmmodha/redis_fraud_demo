@@ -60,35 +60,45 @@ export function ChatbotCompare({ hero }: { hero: HeroProfile | null }) {
     return () => obs.disconnect();
   }, [guide]);
 
+  useEffect(() => {
+    if (!guide) return;
+    guide.registerInsertChat((text) => setInput(text));
+  }, [guide]);
+
   async function send(q: string, promptIndex?: number) {
     if (!hero || !q.trim()) return;
     setTurn({ q, context: null, naive: null, loading: true });
+    guide?.setIsChatLoading(true);
     const req = { customer_id: hero.customer_id, message: q };
-    const [ctx, naive] = await Promise.all([
-      chatContextSurface(req).catch(() => mockChat(hero.customer_id, q, "context") as ChatResponse),
-      chatNaiveRag(req).catch(() => mockChat(hero.customer_id, q, "naive") as ChatResponse),
-    ]);
-    setTurn({ q, context: ctx, naive, loading: false });
+    try {
+      const [ctx, naive] = await Promise.all([
+        chatContextSurface(req).catch(() => mockChat(hero.customer_id, q, "context") as ChatResponse),
+        chatNaiveRag(req).catch(() => mockChat(hero.customer_id, q, "naive") as ChatResponse),
+      ]);
+      setTurn({ q, context: ctx, naive, loading: false });
 
-    const key = normalizePrompt(q);
-    const ctxSaved = tokensSaved(ctx);
-    const naiveSaved = tokensSaved(naive);
-    if (ctxSaved + naiveSaved > 0) {
-      setSessionSaved((s) => s + ctxSaved + naiveSaved);
-      if (stepExpectsEvent(guide?.currentStep ?? null, "chat-cache-hit")) {
-        guide?.completeAction({ type: "chat-cache-hit" });
+      const key = normalizePrompt(q);
+      const ctxSaved = tokensSaved(ctx);
+      const naiveSaved = tokensSaved(naive);
+      if (ctxSaved + naiveSaved > 0) {
+        setSessionSaved((s) => s + ctxSaved + naiveSaved);
+        if (stepExpectsEvent(guide?.currentStep ?? null, "chat-cache-hit")) {
+          guide?.completeAction({ type: "chat-cache-hit" });
+        }
+      } else {
+        setLastMissByPrompt((prev) => ({
+          ...prev,
+          [key]: { context: ctx, naive },
+        }));
       }
-    } else {
-      setLastMissByPrompt((prev) => ({
-        ...prev,
-        [key]: { context: ctx, naive },
-      }));
-    }
 
-    if (promptIndex !== undefined) {
-      guide?.completeAction({ type: "chat-prompt", index: promptIndex });
-    } else if (stepExpectsEvent(guide?.currentStep ?? null, "chat-sent")) {
-      guide?.completeAction({ type: "chat-sent" });
+      if (promptIndex !== undefined) {
+        guide?.completeAction({ type: "chat-prompt", index: promptIndex });
+      } else if (stepExpectsEvent(guide?.currentStep ?? null, "chat-sent")) {
+        guide?.completeAction({ type: "chat-sent" });
+      }
+    } finally {
+      guide?.setIsChatLoading(false);
     }
   }
 

@@ -62,13 +62,13 @@ export function GuideSpotlight() {
         setScrolling(true);
         setRect(null);
         const scrollEl = resolveScrollAnchor(currentStep!) ?? el;
-        await scrollGuideTargetIntoView(scrollEl, scrollBlockForStep(currentStep!));
+        await scrollGuideTargetIntoView(scrollEl, scrollBlockForStep(currentStep!), true);
         if (cancelled) return;
         scrollingRef.current = false;
         setScrolling(false);
       }
 
-      setRect(toRect(measureGuideTargetRect(el)));
+      setRect(toRect(measureGuideTargetRect(el, true)));
     }
 
     void alignAndMeasure(stepChanged);
@@ -80,7 +80,7 @@ export function GuideSpotlight() {
         setRect(null);
         return;
       }
-      setRect(toRect(measureGuideTargetRect(el)));
+      setRect(toRect(measureGuideTargetRect(el, true)));
     }
 
     const el = resolveTarget(currentStep);

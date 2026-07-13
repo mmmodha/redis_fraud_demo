@@ -256,13 +256,24 @@ Toggle **Guide mode** in the top bar for a paced, educational walkthrough. The s
 panel explains what Redis is doing at each step — use **Continue** to move at your
 own speed through read-only beats.
 
+**Presenter tips:**
+
+- **Run from the guide panel** — on run steps, the hero card Run button is hidden so
+  the audience follows one primary CTA in the guide panel.
+- **OTP wording** — guide copy says "verify with OTP" / "Review Required" instead of
+  internal "step-up" jargon; Sarah's step explains the one-time code texted to the customer.
+- **Clipboard on VMs** — "Copy to clipboard" needs HTTPS; on `http://<vm-ip>:3000` use
+  **Insert into chat** for the LangCache typing step, or rely on the execCommand fallback.
+- **Thinking banner** — while a scenario scores or chat loads, the guide panel shows a
+  prominent status strip so the audience knows work is in progress.
+
 ### Flow
 
 1. **Welcome** → **Meet Mike** (Mike auto-selected)
 2. **Mike** — verdict, trace, analyst summary, Feature Store, Context Retriever
 3. **Jane** — near-miss, travel memory, chatbot (preset + LangCache), verdict cache replay
 4. **Alex** — fraud blocked using Feature Store + Context Retriever data points
-5. **Sarah** — step-up auth (OTP), memory + features
+5. **Sarah** — OTP verification (Review Required), memory + features
 6. **Recap** — business summary of Redis value for any LLM, then **Finish tour**
 
 Guide copy is LLM-agnostic: the point is Redis data improves accuracy and cost for

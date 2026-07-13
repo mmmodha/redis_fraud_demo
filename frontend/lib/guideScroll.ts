@@ -1,4 +1,5 @@
 import type { GuideStep } from "@/lib/demoGuide";
+import { guidePanelWidthPx } from "@/lib/guideLayout";
 
 /** Fixed TopBar + breathing room when scrolling guide targets into view. */
 export const GUIDE_SCROLL_TOP_OFFSET = 88;
@@ -56,14 +57,17 @@ function waitForScrollSettle(ms = 520): Promise<void> {
   });
 }
 
-/** Scroll so the target sits in a sensible viewport band (accounts for fixed TopBar). */
+/** Scroll so the target sits in a sensible viewport band (accounts for fixed TopBar + guide panel). */
 export async function scrollGuideTargetIntoView(
   el: Element,
   block: ScrollBlock,
+  guideMode = false,
 ): Promise<void> {
   const rect = el.getBoundingClientRect();
   const docTop = window.scrollY + rect.top;
   const viewportH = window.innerHeight;
+  const panelW = guideMode ? guidePanelWidthPx(window.innerWidth) : 0;
+  const visibleW = window.innerWidth - panelW;
   const maxScroll = Math.max(0, document.documentElement.scrollHeight - viewportH);
 
   let targetScroll: number;
@@ -72,6 +76,15 @@ export async function scrollGuideTargetIntoView(
   } else {
     const visibleH = viewportH - GUIDE_SCROLL_TOP_OFFSET - 32;
     targetScroll = docTop - GUIDE_SCROLL_TOP_OFFSET - (visibleH - rect.height) / 2;
+    // Bias left so content isn't hidden under the fixed guide panel.
+    if (guideMode && panelW > 0) {
+      const elCenter = rect.left + rect.width / 2;
+      const idealCenter = visibleW / 2;
+      const shift = elCenter - idealCenter;
+      if (Math.abs(shift) > 24) {
+        targetScroll += shift * 0.35;
+      }
+    }
   }
 
   targetScroll = Math.max(0, Math.min(targetScroll, maxScroll));
@@ -86,6 +99,12 @@ export async function scrollGuideTargetIntoView(
   await new Promise<void>((r) => requestAnimationFrame(() => r()));
 }
 
-export function measureGuideTargetRect(el: Element): DOMRect {
-  return el.getBoundingClientRect();
+export function measureGuideTargetRect(el: Element, guideMode = false): DOMRect {
+  const rect = el.getBoundingClientRect();
+  if (!guideMode) return rect;
+  const panelW = guidePanelWidthPx(window.innerWidth);
+  const maxRight = window.innerWidth - panelW - 8;
+  if (rect.right <= maxRight) return rect;
+  const clampedWidth = Math.max(0, maxRight - rect.left);
+  return new DOMRect(rect.x, rect.y, clampedWidth, rect.height);
 }
