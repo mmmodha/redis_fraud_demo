@@ -39,6 +39,24 @@ test.describe("Guide mode", () => {
     await expect(page.getByTestId("guide-iris-diagram-context-retriever")).toBeVisible();
   });
 
+  test("feature store step shows plain-language field decoders", async ({ page }) => {
+    await page.goto("/");
+    await page.getByTestId("guide-mode-toggle").click();
+    await page.getByTestId("guide-continue").click();
+    await page.getByTestId("guide-run-hero").click();
+    await expect(page.getByText("The verdict — fast and confident")).toBeVisible({
+      timeout: 15000,
+    });
+    for (let i = 0; i < 3; i++) {
+      await page.getByTestId("guide-continue").click();
+    }
+    await expect(page.getByText("Feature Store — the accuracy scorecard")).toBeVisible();
+    const decode = page.getByTestId("guide-panel-decode");
+    await expect(decode).toBeVisible();
+    await expect(decode).toContainText("geo_entropy");
+    await expect(decode).toContainText("within baseline");
+  });
+
   test("guide run button is primary on run steps", async ({ page }) => {
     await page.goto("/");
     await page.getByTestId("guide-mode-toggle").click();

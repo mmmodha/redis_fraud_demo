@@ -40,6 +40,8 @@ export type GuideStep = {
   panelHints?: GuidePanelHints;
   /** Animated IRIS architecture diagram (same assets as "How IRIS works"). */
   irisDiagram?: IrisDiagramSlug;
+  /** Plain-language decoder for highlighted panel fields on this step. */
+  panelDecode?: Array<{ term: string; meaning: string }>;
 };
 
 export const GUIDE_STEPS: GuideStep[] = [
@@ -90,6 +92,13 @@ export const GUIDE_STEPS: GuideStep[] = [
     panelHints: {
       traceStrip: { focusComponent: "feature_store" },
     },
+    panelDecode: [
+      {
+        term: "feature_store step",
+        meaning:
+          "The agent asked Redis for pre-computed card signals — spend velocity, location pattern, device history — before calling the LLM.",
+      },
+    ],
     advance: { mode: "manual" },
   },
   {
@@ -117,6 +126,28 @@ export const GUIDE_STEPS: GuideStep[] = [
     panelHints: {
       featureStore: { focusTraceContains: "within baseline" },
     },
+    panelDecode: [
+      {
+        term: "geo_entropy ≈ 0",
+        meaning:
+          "Mike's card has only been used in the US lately — no sudden country jumps. That's normal for coffee at home, not a fraud pattern.",
+      },
+      {
+        term: "velocity_1h / velocity_24h",
+        meaning:
+          "How many times the card was tapped recently. Mike's counts are low and steady — a regular day, not a card-testing spree.",
+      },
+      {
+        term: "new_device_24h = 0",
+        meaning:
+          "This swipe came from a phone Redis has seen before. A brand-new device would show 1 and raise suspicion.",
+      },
+      {
+        term: "Highlighted: within baseline",
+        meaning:
+          "The $6.75 coffee fits Mike's usual spend band — nothing unusual for the agent to escalate.",
+      },
+    ],
     advance: { mode: "manual" },
   },
   {
@@ -129,6 +160,13 @@ export const GUIDE_STEPS: GuideStep[] = [
     target: '[data-guide="panel-context-retriever"]',
     hero: "mike",
     irisDiagram: "context-retriever",
+    panelDecode: [
+      {
+        term: "Context Retriever tools",
+        meaning:
+          "Each row is a live lookup against Redis — customer profile, recent transactions, devices. Milliseconds per call, no warehouse query.",
+      },
+    ],
     advance: { mode: "manual" },
   },
   {
@@ -179,6 +217,18 @@ export const GUIDE_STEPS: GuideStep[] = [
     panelHints: {
       agentMemory: { focusSummary: true },
     },
+    panelDecode: [
+      {
+        term: "Travel note (Agent Memory)",
+        meaning:
+          "Jane told the bank she's in Singapore this week. Foreign + luxury signals look risky until this note explains why APPROVE is correct.",
+      },
+      {
+        term: "Why not Feature Store alone?",
+        meaning:
+          "Velocity and location flags still look hot — memory adds the relationship context the scorecard can't see.",
+      },
+    ],
     advance: { mode: "manual" },
   },
 
@@ -299,6 +349,28 @@ export const GUIDE_STEPS: GuideStep[] = [
       featureStore: { focusTraceContains: "impossible-travel" },
       contextRetriever: { focusTool: "get_devices_for_customer" },
     },
+    panelDecode: [
+      {
+        term: "geo_entropy ≈ 0.9",
+        meaning:
+          "Alex's card jumped countries unnaturally fast — US history, then Brazil within hours. High entropy = location chaos, a classic fraud signal.",
+      },
+      {
+        term: "Highlighted: impossible travel",
+        meaning:
+          "Seattle activity this morning and São Paulo electronics now — physically implausible for one person.",
+      },
+      {
+        term: "new_device_24h = 1",
+        meaning:
+          "The swipe came from a phone Alex has never used. Combined with the country jump, that's a strong block signal.",
+      },
+      {
+        term: "get_devices_for_customer",
+        meaning:
+          "Lists devices tied to Alex. The highlighted row is the unfamiliar Android — not his usual MacBook.",
+      },
+    ],
     advance: { mode: "manual" },
   },
 
@@ -342,6 +414,28 @@ export const GUIDE_STEPS: GuideStep[] = [
       agentMemory: { focusSummary: true },
       featureStore: { focusTraceContains: "5x typical" },
     },
+    panelDecode: [
+      {
+        term: "Travel note (Agent Memory)",
+        meaning:
+          "Sarah is genuinely in New York this week — she's not halfway across the world from home.",
+      },
+      {
+        term: "Highlighted: 5× typical spend",
+        meaning:
+          "She usually spends ~$280/day; $1,450 at Tiffany is a big jump. Unusual, but not impossible for a luxury purchase while travelling.",
+      },
+      {
+        term: "geo_entropy low",
+        meaning:
+          "Her recent swipes cluster in NYC — location matches the travel story, so block isn't the right call.",
+      },
+      {
+        term: "Why OTP instead of approve?",
+        meaning:
+          "Redis has enough context to avoid a false block, but the amount is high enough to text Sarah a one-time code before approving.",
+      },
+    ],
     advance: { mode: "manual" },
   },
 

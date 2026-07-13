@@ -130,6 +130,25 @@ export function DemoGuidePanel() {
           {step.instruction}
         </p>
 
+        {step.panelDecode && step.panelDecode.length > 0 && (
+          <div
+            className="mt-4 rounded-redis border border-redis-border bg-redis-bg-tertiary px-3 py-2"
+            data-testid="guide-panel-decode"
+          >
+            <div className="font-redis-mono text-[10px] uppercase tracking-wider text-redis-text-muted">
+              What you&apos;re seeing
+            </div>
+            <ul className="mt-2 space-y-2.5">
+              {step.panelDecode.map(({ term, meaning }) => (
+                <li key={term} className="font-redis-body text-xs leading-relaxed">
+                  <span className="font-semibold text-redis-text">{term}</span>
+                  <span className="text-redis-text-secondary"> — {meaning}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {step.redisBenefit && (
           <div className="mt-4 rounded-redis border border-redis-hyper/30 bg-redis-hyper/5 px-3 py-2">
             <div className="font-redis-mono text-[10px] uppercase tracking-wider text-redis-hyper">
