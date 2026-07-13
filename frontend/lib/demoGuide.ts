@@ -54,25 +54,14 @@ export const GUIDE_STEPS: GuideStep[] = [
     advance: { mode: "manual" },
   },
   {
-    id: "meet-mike",
+    id: "mike-run",
     title: "Meet Mike — everyday spending",
     instruction:
-      "Mike buys a $6.75 coffee in Austin. Read the scenario on his card — what would you call it: approve, verify with OTP, or block?",
+      "Mike buys a $6.75 coffee in Austin. Read the scenario on his card — what would you call it: approve, verify with OTP, or block?\n\nWhen you've made your call, click **Run scenario** in this panel. Watch the verdict appear — then we'll walk through why Redis decided that way.",
     presenterLine: "What do you think? Approve, verify with OTP, or block?",
-    target: '[data-guide="hero-mike"]',
     hero: "mike",
+    target: '[data-guide="hero-mike"]',
     activateHero: "mike",
-    advance: { mode: "manual" },
-  },
-
-  // ── Mike — full tutorial ───────────────────────────────────────────────
-  {
-    id: "mike-run",
-    title: "Run Mike's scenario",
-    instruction:
-      'Click **Run scenario** in this panel. Watch the verdict appear — then we\'ll walk through why Redis decided that way.',
-    hero: "mike",
-    target: '[data-guide="hero-mike"]',
     suggestedAction: "run-hero",
     advance: { mode: "event", event: { type: "hero-run", hero: "mike" } },
   },
@@ -153,23 +142,14 @@ export const GUIDE_STEPS: GuideStep[] = [
 
   // ── Jane — focused ─────────────────────────────────────────────────────
   {
-    id: "jane-meet",
+    id: "jane-run",
     title: "Jane — the $1,820 question",
     instruction:
-      "Luxury boutique in Singapore — foreign country, high amount. Read Jane's scenario on her card — what would you call it: approve, verify with OTP, or block?",
+      "Luxury boutique in Singapore — foreign country, high amount. Read Jane's scenario on her card — what would you call it: approve, verify with OTP, or block?\n\nWhen you've made your call, click **Run scenario** in this panel. Watch whether Redis approves despite the risky-looking signals.",
     presenterLine: "What do you think? Approve, verify with OTP, or block?",
     hero: "jane",
     target: '[data-guide="hero-jane"]',
     activateHero: "jane",
-    advance: { mode: "manual" },
-  },
-  {
-    id: "jane-run",
-    title: "Run Jane's scenario",
-    instruction:
-      'Click **Run scenario** in this panel. Watch whether Redis approves despite the risky-looking signals.',
-    hero: "jane",
-    target: '[data-guide="hero-jane"]',
     suggestedAction: "run-hero",
     advance: { mode: "event", event: { type: "hero-run", hero: "jane" } },
   },
@@ -204,20 +184,12 @@ export const GUIDE_STEPS: GuideStep[] = [
 
   // ── Jane chatbot ─────────────────────────────────────────────────────────
   {
-    id: "chatbot-intro",
+    id: "chat-prompt-0",
     title: "Jane's analyst chatbot",
     instruction:
-      "Scroll down to the Insight Chatbot section below. When you can see it, read this panel and click Continue — we'll try a sample question next.",
+      'Scroll to the Insight Chatbot below, then click the first suggested question: "Any upcoming travel?" Watch both pipelines respond — same LLM, but only one side has live customer context from Redis.',
     presenterLine: GUIDE_MANTRA,
     hero: "jane",
-    target: '[data-guide="chatbot"]',
-    advance: { mode: "manual" },
-  },
-  {
-    id: "chat-prompt-0",
-    title: 'Try: "Any upcoming travel?"',
-    instruction:
-      'Click the first suggested question. Watch both pipelines respond — same LLM, but only one side has live customer context from Redis.',
     target: '[data-guide="chat-prompt-0"]',
     advance: { mode: "event", event: { type: "chat-prompt", index: 0 } },
   },
@@ -291,23 +263,14 @@ export const GUIDE_STEPS: GuideStep[] = [
 
   // ── Alex — focused ─────────────────────────────────────────────────────
   {
-    id: "alex-meet",
+    id: "alex-run",
     title: "Alex — wrong device, wrong continent",
     instruction:
-      "Electronics in São Paulo — read Alex's bio and scenario on his card. What would you call it: approve, verify with OTP, or block?",
+      "Electronics in São Paulo — read Alex's bio and scenario on his card. What would you call it: approve, verify with OTP, or block?\n\nWhen you've made your call, click **Run scenario** in this panel and see what Redis decides.",
     presenterLine: "What do you think? Approve, verify with OTP, or block?",
     hero: "alex",
     target: '[data-guide="hero-alex"]',
     activateHero: "alex",
-    advance: { mode: "manual" },
-  },
-  {
-    id: "alex-run",
-    title: "Run Alex's scenario",
-    instruction:
-      'Click **Run scenario** in this panel and see what Redis decides.',
-    hero: "alex",
-    target: '[data-guide="hero-alex"]',
     suggestedAction: "run-hero",
     advance: { mode: "event", event: { type: "hero-run", hero: "alex" } },
   },
@@ -341,23 +304,14 @@ export const GUIDE_STEPS: GuideStep[] = [
 
   // ── Sarah — focused ────────────────────────────────────────────────────
   {
-    id: "sarah-meet",
+    id: "sarah-run",
     title: "Sarah — the split decision",
     instruction:
-      "Tiffany & Co in Manhattan for $1,450 — friendly profile, high value, away from home. Read Sarah's scenario — what would you call it: approve, verify with OTP, or block?",
+      "Tiffany & Co in Manhattan for $1,450 — friendly profile, high value, away from home. Read Sarah's scenario — what would you call it: approve, verify with OTP, or block?\n\nWhen you've made your call, click **Run scenario** in this panel. Watch for Review Required and the OTP confirmation flow.",
     presenterLine: "What do you think? Approve, verify with OTP, or block?",
     hero: "sarah",
     target: '[data-guide="hero-sarah"]',
     activateHero: "sarah",
-    advance: { mode: "manual" },
-  },
-  {
-    id: "sarah-run",
-    title: "Run Sarah's scenario",
-    instruction:
-      'Click **Run scenario** in this panel. Watch for Review Required and the OTP confirmation flow.',
-    hero: "sarah",
-    target: '[data-guide="hero-sarah"]',
     suggestedAction: "run-hero",
     advance: { mode: "event", event: { type: "hero-run", hero: "sarah" } },
   },

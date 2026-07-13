@@ -269,7 +269,7 @@ own speed through read-only beats.
 
 ### Flow
 
-1. **Welcome** → **Meet Mike** (Mike auto-selected)
+1. **Welcome** → **Mike** (read scenario + run from guide panel)
 2. **Mike** — verdict, trace, analyst summary, Feature Store, Context Retriever
 3. **Jane** — near-miss, travel memory, chatbot (preset + LangCache), verdict cache replay
 4. **Alex** — fraud blocked using Feature Store + Context Retriever data points

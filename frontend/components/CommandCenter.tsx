@@ -224,10 +224,6 @@ export function CommandCenter() {
           const guideOn = guide?.guideMode === true;
           const step = guide?.currentStep ?? null;
           const isRunStep = isGuideRunStepForHero(step, h.key);
-          const isMeetHero =
-            step?.hero === h.key &&
-            step.activateHero === h.key &&
-            !isRunStep;
           return (
           <HeroCard
             key={h.key}
@@ -237,13 +233,7 @@ export function CommandCenter() {
             verdict={fastVerdicts[h.customer_id]?.verdict ?? scores[h.customer_id]?.verdict ?? null}
             guideHideRun={guideOn}
             guideRunHint={
-              !guideOn
-                ? undefined
-                : isRunStep
-                  ? "use-panel"
-                  : isMeetHero
-                    ? "next-step"
-                    : "follow-guide"
+              !guideOn ? undefined : isRunStep ? "use-panel" : "follow-guide"
             }
             onSelect={() => {
               setActiveKey(h.key);

@@ -11,20 +11,20 @@ async function guideAdvance(page: Page) {
   await cont.click();
 }
 
-test.describe("Guide step 15 diagram", () => {
+test.describe("Guide chat-compare diagram", () => {
   test("chat-compare renders context retriever animation", async ({ page }) => {
     await page.goto("/");
     await page.getByTestId("guide-mode-toggle").click();
 
-    // Steps 1–13: continue / run as needed (analyst summary gate on step 6).
-    for (let i = 0; i < 13; i++) {
+    // Steps 1–11: continue / run through Jane panels (one fewer after meet+run merge).
+    for (let i = 0; i < 11; i++) {
       await guideAdvance(page);
     }
 
-    // Step 14: click first chat prompt (event advance)
+    // Step 12: click first chat prompt (event advance)
     await page.locator('[data-guide="chat-prompt-0"]').click({ timeout: 15_000 });
 
-    await expect(page.getByText("Step 15 of")).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText("Step 13 of")).toBeVisible({ timeout: 10_000 });
     await expect(page.getByText("Same LLM, different answer quality")).toBeVisible();
     const diagram = page.getByTestId("guide-iris-diagram-context-retriever");
     await expect(diagram).toBeVisible();
