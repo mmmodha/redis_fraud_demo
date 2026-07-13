@@ -18,8 +18,15 @@ import {
   type GuideStep,
   type HeroKey,
 } from "@/lib/demoGuide";
+import { DEMO_UI_RESET_EVENT } from "@/lib/demoEvents";
 
 const STORAGE_KEY = "fcc-guide-mode";
+
+function dispatchDemoUiReset() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(DEMO_UI_RESET_EVENT));
+  }
+}
 
 type RunHeroFn = (heroKey: HeroKey) => void;
 type SelectHeroFn = (heroKey: HeroKey) => void;
@@ -97,6 +104,7 @@ export function DemoGuideProvider({ children }: { children: ReactNode }) {
       setIsChatLoading(false);
       prevStepIdRef.current = null;
       prevStepHeroRef.current = undefined;
+      dispatchDemoUiReset();
     }
   }, []);
 
@@ -162,6 +170,7 @@ export function DemoGuideProvider({ children }: { children: ReactNode }) {
     setIsChatLoading(false);
     prevStepIdRef.current = null;
     prevStepHeroRef.current = undefined;
+    dispatchDemoUiReset();
   }, []);
 
   const registerRunHero = useCallback((fn: RunHeroFn) => {

@@ -68,6 +68,26 @@ test.describe("Guide mode", () => {
     await expect(page.getByText("The verdict — fast and confident")).toBeVisible();
   });
 
+  test("restart and re-enabling guide clear hero verdicts", async ({ page }) => {
+    await page.goto("/");
+    await page.getByTestId("guide-mode-toggle").click();
+    await page.getByTestId("guide-continue").click();
+    await page.getByTestId("guide-run-hero").click();
+    await expect(page.getByTestId("hero-verdict-mike")).toBeVisible({ timeout: 15000 });
+
+    await page.getByTestId("guide-mode-toggle").click(); // guide off
+    await page.getByTestId("guide-mode-toggle").click(); // guide on — fresh tour
+    await expect(page.getByTestId("hero-verdict-mike")).toHaveCount(0);
+
+    await page.getByTestId("guide-continue").click();
+    await page.getByTestId("guide-run-hero").click();
+    await expect(page.getByTestId("hero-verdict-mike")).toBeVisible({ timeout: 15000 });
+
+    await page.getByText("Restart").click();
+    await expect(page.getByTestId("hero-verdict-mike")).toHaveCount(0);
+    await expect(page.getByText("Welcome to the Fraud Command Center")).toBeVisible();
+  });
+
   test("clipboard helper falls back when navigator.clipboard rejects", async ({
     page,
   }) => {

@@ -12,7 +12,7 @@ import type {
 import { confirmOtp, fetchVerdictFast, scoreHeroStream } from "@/lib/api";
 import { mockScoreStream } from "@/lib/mock";
 import { HeroCard } from "./HeroCard";
-import { CACHE_CLEARED_EVENT } from "./TopBar";
+import { DEMO_UI_RESET_EVENT } from "@/lib/demoEvents";
 import { VerdictCard, type OtpState } from "./VerdictCard";
 import { RdiPanel } from "./iris/RdiPanel";
 import { FeatureStorePanel } from "./iris/FeatureStorePanel";
@@ -39,6 +39,7 @@ export function CommandCenter() {
     Record<string, OtpConfirmResponse | null>
   >({});
   const [otpLatencyMs, setOtpLatencyMs] = useState<Record<string, number>>({});
+  const [demoSessionKey, setDemoSessionKey] = useState(0);
   const otpFiredFor = useRef<Set<string>>(new Set());
   const runHeroRef = useRef<(hero: HeroProfile, bypassCache?: boolean) => Promise<void>>(
     async () => {},
@@ -111,21 +112,27 @@ export function CommandCenter() {
   }, [activeHero, activeFast]);
 
   useEffect(() => {
-    function onCleared() {
+    function onDemoUiReset() {
       setScores({});
       setFastVerdicts({});
+      setRunIds({});
+      setLoadingKey(null);
       setStepsByCustomer({});
       setThinkingByCustomer({});
       setOtpStates({});
       setOtpResults({});
       setOtpLatencyMs({});
+      setActiveKey(HEROES[0].key);
+      setDemoSessionKey((k) => k + 1);
       otpFiredFor.current.clear();
       guide?.setScoreReadyForHero(null);
       guide?.setCacheHitForHero(null);
       guide?.setOtpConfirmedForSarah(false);
+      guide?.setIsScoringHero(null);
+      guide?.setIsChatLoading(false);
     }
-    window.addEventListener(CACHE_CLEARED_EVENT, onCleared);
-    return () => window.removeEventListener(CACHE_CLEARED_EVENT, onCleared);
+    window.addEventListener(DEMO_UI_RESET_EVENT, onDemoUiReset);
+    return () => window.removeEventListener(DEMO_UI_RESET_EVENT, onDemoUiReset);
   }, [guide]);
 
   const runHero = useCallback(async (hero: HeroProfile, bypassCache: boolean = false) => {
@@ -260,7 +267,11 @@ export function CommandCenter() {
           />
           <TraceStrip steps={visibleSteps} thinking={activeThinking} />
           <ChatbotCompare
-            key={activeHero ? `${activeHero.customer_id}:${activeRunId}` : "none"}
+            key={
+              activeHero
+                ? `${activeHero.customer_id}:${activeRunId}:${demoSessionKey}`
+                : `none:${demoSessionKey}`
+            }
             hero={activeHero}
           />
         </div>

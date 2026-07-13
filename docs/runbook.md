@@ -266,6 +266,9 @@ own speed through read-only beats.
   **Insert into chat** for the LangCache typing step, or rely on the execCommand fallback.
 - **Thinking banner** — while a scenario scores or chat loads, the guide panel shows a
   prominent status strip so the audience knows work is in progress.
+- **Fresh tour** — turning Guide mode on again or clicking **Restart** clears hero
+  verdicts, traces, OTP state, and chat so each run starts clean (Redis server cache
+  is unchanged unless you use **Clear cache** in the top bar).
 
 ### Flow
 

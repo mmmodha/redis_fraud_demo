@@ -1,12 +1,12 @@
 "use client";
 import { useEffect, useState } from "react";
 import { checkHealth, clearDemoCache } from "@/lib/api";
+import { DEMO_UI_RESET_EVENT } from "@/lib/demoEvents";
 import { IrisDiagramModal } from "./IrisDiagramModal";
 import { useDemoGuide } from "./DemoGuideProvider";
 
-// Wave 7n: presenter "Clear cache" affordance fires a window event so the
-// CommandCenter (which owns hero verdict state) resets without prop drilling.
-export const CACHE_CLEARED_EVENT = "demo:cache-cleared";
+// Wave 7n: presenter "Clear cache" also resets hero verdict UI state.
+export const CACHE_CLEARED_EVENT = DEMO_UI_RESET_EVENT;
 
 export function TopBar() {
   const [live, setLive] = useState<boolean | null>(null);
@@ -24,7 +24,7 @@ export function TopBar() {
       // Best-effort; UI still resets so the presenter can move on.
     }
     if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent(CACHE_CLEARED_EVENT));
+      window.dispatchEvent(new CustomEvent(DEMO_UI_RESET_EVENT));
     }
     setClearState("done");
     setTimeout(() => setClearState("idle"), 1500);
