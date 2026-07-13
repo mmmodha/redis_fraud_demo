@@ -32,6 +32,7 @@ type DemoGuideContextValue = {
   currentStep: GuideStep | null;
   completeAction: (event: GuideEvent) => void;
   continueStep: () => void;
+  goBackStep: () => void;
   skipStep: () => void;
   resetGuide: () => void;
   registerRunHero: (fn: RunHeroFn) => void;
@@ -66,7 +67,6 @@ export function DemoGuideProvider({ children }: { children: ReactNode }) {
   const insertChatRef = useRef<InsertChatFn | null>(null);
   const prevStepIdRef = useRef<string | null>(null);
   const prevStepHeroRef = useRef<HeroKey | undefined>(undefined);
-  const autoSkipCheckedRef = useRef<string | null>(null);
 
   useEffect(() => {
     try {
@@ -97,7 +97,6 @@ export function DemoGuideProvider({ children }: { children: ReactNode }) {
       setIsChatLoading(false);
       prevStepIdRef.current = null;
       prevStepHeroRef.current = undefined;
-      autoSkipCheckedRef.current = null;
     }
   }, []);
 
@@ -116,9 +115,39 @@ export function DemoGuideProvider({ children }: { children: ReactNode }) {
   const continueStep = useCallback(() => {
     if (!guideMode) return;
     const step = GUIDE_STEPS[currentStepIndex];
-    if (!step || step.advance.mode !== "manual") return;
-    advance();
-  }, [guideMode, currentStepIndex, advance]);
+    if (!step) return;
+    // Manual steps, or event run/replay steps where the action already completed (back + continue).
+    if (step.advance.mode === "manual") {
+      advance();
+      return;
+    }
+    if (
+      step.suggestedAction === "run-hero" &&
+      step.hero &&
+      scoreReadyForHero === step.hero
+    ) {
+      advance();
+      return;
+    }
+    if (
+      step.advance.mode === "event" &&
+      step.advance.event.type === "hero-cache-hit" &&
+      step.hero &&
+      cacheHitForHero === step.hero
+    ) {
+      advance();
+    }
+  }, [guideMode, currentStepIndex, advance, scoreReadyForHero, cacheHitForHero]);
+
+  const goBackStep = useCallback(() => {
+    if (!guideMode) return;
+    setCurrentStepIndex((i) => {
+      if (i <= 0) return 0;
+      return i - 1;
+    });
+    // Re-run hero activation and spotlight when landing on the previous step.
+    prevStepIdRef.current = null;
+  }, [guideMode]);
 
   const skipStep = useCallback(() => {
     advance();
@@ -133,7 +162,6 @@ export function DemoGuideProvider({ children }: { children: ReactNode }) {
     setIsChatLoading(false);
     prevStepIdRef.current = null;
     prevStepHeroRef.current = undefined;
-    autoSkipCheckedRef.current = null;
   }, []);
 
   const registerRunHero = useCallback((fn: RunHeroFn) => {
@@ -160,7 +188,7 @@ export function DemoGuideProvider({ children }: { children: ReactNode }) {
 
   const currentStep = guideMode ? GUIDE_STEPS[currentStepIndex] ?? null : null;
 
-  // Activate hero and reset stale gates when step changes.
+  // Activate hero and reset stale gates when step changes forward across heroes.
   useEffect(() => {
     if (!guideMode || !currentStep) return;
     if (currentStep.id === prevStepIdRef.current) return;
@@ -185,32 +213,6 @@ export function DemoGuideProvider({ children }: { children: ReactNode }) {
     }
   }, [guideMode, currentStep]);
 
-  // Skip redundant run / cache-replay steps when entering a step whose action is already done.
-  useEffect(() => {
-    if (!guideMode || !currentStep) return;
-    if (autoSkipCheckedRef.current === currentStep.id) return;
-    autoSkipCheckedRef.current = currentStep.id;
-
-    if (
-      currentStep.suggestedAction === "run-hero" &&
-      currentStep.hero &&
-      scoreReadyForHero === currentStep.hero
-    ) {
-      const t = setTimeout(advance, 400);
-      return () => clearTimeout(t);
-    }
-
-    if (
-      currentStep.advance.mode === "event" &&
-      currentStep.advance.event.type === "hero-cache-hit" &&
-      currentStep.hero &&
-      cacheHitForHero === currentStep.hero
-    ) {
-      const t = setTimeout(advance, 400);
-      return () => clearTimeout(t);
-    }
-  }, [guideMode, currentStep, scoreReadyForHero, cacheHitForHero, advance]);
-
   const value = useMemo(
     (): DemoGuideContextValue => ({
       guideMode,
@@ -219,6 +221,7 @@ export function DemoGuideProvider({ children }: { children: ReactNode }) {
       currentStep,
       completeAction: advanceIfMatch,
       continueStep,
+      goBackStep,
       skipStep,
       resetGuide,
       registerRunHero,
@@ -244,6 +247,7 @@ export function DemoGuideProvider({ children }: { children: ReactNode }) {
       currentStep,
       advanceIfMatch,
       continueStep,
+      goBackStep,
       skipStep,
       resetGuide,
       registerRunHero,
