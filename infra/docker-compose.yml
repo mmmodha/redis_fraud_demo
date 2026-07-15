@@ -129,7 +129,8 @@ services:
       context: ../frontend
       args:
         NEXT_PUBLIC_REDIS_CLOUD_URL: ${NEXT_PUBLIC_REDIS_CLOUD_URL:-https://app.redislabs.com/}
-        NEXT_PUBLIC_CONTEXT_RETRIEVER_URL: ${NEXT_PUBLIC_CONTEXT_RETRIEVER_URL:-}
+        # Prefer explicit URL; otherwise derive from CTX_SURFACE_ID written by context-up.
+        NEXT_PUBLIC_CONTEXT_RETRIEVER_URL: ${NEXT_PUBLIC_CONTEXT_RETRIEVER_URL:-https://app.redislabs.com/#/context-retriever/${CTX_SURFACE_ID}}
         NEXT_PUBLIC_GITHUB_URL: ${NEXT_PUBLIC_GITHUB_URL:-}
     container_name: fcc-frontend
     ports:

@@ -13,29 +13,25 @@ customer (four heroes) + 3 minutes for the chatbot comparison.
 
 ### 1. Environment
 
-`.env` must contain values for the following variable **names** (never
-print or screen-share the values):
+Follow [`.env.example`](../.env.example) — three sections:
 
-| Variable             | Purpose                                                    |
-| -------------------- | ---------------------------------------------------------- |
-| `REDIS_URL`          | Redis Cloud connection string                              |
-| `CTX_ADMIN_KEY`      | Context Retriever admin key (only needed for `make context-up`) |
-| `CTX_SURFACE_ID`     | Auto-filled by `make context-up`                           |
-| `CTX_AGENT_KEY`      | Auto-filled by `make context-up`                           |
-| `ANTHROPIC_API_KEY`  | Claude Sonnet key (required when `AGENT_MODE=claude`)      |
-| `AGENT_MODE`         | `claude` (live demo) or `stub` (offline rehearsal fallback) |
+| Section | What to do |
+| ------- | ---------- |
+| **YOU SET** | `REDIS_URL`, `ANTHROPIC_API_KEY`, `CTX_ADMIN_KEY`, optional LangCache + TopBar links (`NEXT_PUBLIC_REDIS_CLOUD_URL`, `NEXT_PUBLIC_GITHUB_URL`) |
+| **AUTO-WRITTEN** | `CTX_SURFACE_ID`, `CTX_AGENT_KEY`, `NEXT_PUBLIC_CONTEXT_RETRIEVER_URL` (= `https://app.redislabs.com/#/context-retriever/<CTX_SURFACE_ID>`) — filled by `make context-up` / `make demo` |
+| **ADVANCED** | Postgres / ports — leave at compose defaults |
 
-`.env.example` at the repo root is the canonical list — copy it, fill it
-in, never commit it.
+Zero-config: `cp .env.example .env` and leave values blank, then `make demo`.
+Never print or screen-share secret values; never commit `.env`.
 
 #### Customizing TopBar links for your tenancy
 
-The three links in the page header are sourced from `NEXT_PUBLIC_*` env
-vars baked at frontend build time. Set `NEXT_PUBLIC_REDIS_CLOUD_URL` (your
-Redis Cloud database "Open Database" URL), `NEXT_PUBLIC_CONTEXT_RETRIEVER_URL`
-(your Context Retriever surface page), and `NEXT_PUBLIC_GITHUB_URL` (this
-demo's repo) in `.env`. Leave Context Retriever / GitHub blank to hide those
-links. After changing any of them, rebuild the frontend:
+`NEXT_PUBLIC_REDIS_CLOUD_URL` and `NEXT_PUBLIC_GITHUB_URL` are optional links
+you set in `.env`. `NEXT_PUBLIC_CONTEXT_RETRIEVER_URL` is auto-written by
+`make context-up` / `make demo` from `CTX_SURFACE_ID` as
+`https://app.redislabs.com/#/context-retriever/<CTX_SURFACE_ID>` — do not set it
+by hand. After changing TopBar-related vars (or after context-up writes a new
+surface id), rebuild the frontend:
 
 ```bash
 docker compose -f infra/docker-compose.yml --env-file .env build frontend

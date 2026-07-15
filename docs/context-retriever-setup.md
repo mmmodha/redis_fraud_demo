@@ -51,14 +51,18 @@ What it does, in order (all idempotent):
    - Finds the `fraud-command-center` surface by name; creates it if missing
      using the `ContextModel` classes from `backend/app/context_models.py`.
    - Mints a fresh agent key (`fraud-agent-<pid>`).
-   - Writes `CTX_SURFACE_ID` + `CTX_AGENT_KEY` back into `.env` in place.
+   - Writes `CTX_SURFACE_ID`, `CTX_AGENT_KEY`, and
+     `NEXT_PUBLIC_CONTEXT_RETRIEVER_URL`
+     (`https://app.redislabs.com/#/context-retriever/<CTX_SURFACE_ID>`)
+     back into `.env` in place.
 3. Dumps the tool catalog (`ctxctl tools list --agent-key <redacted>`).
 4. Calls one sample tool (`get_customer_by_id` for `cust_mike`) to prove
    end-to-end wiring works.
 
 **Re-running is safe.** A second `make context-up` reuses the existing surface
-and just writes a new agent key. Old agent keys keep working — they're never
-deleted by the bootstrap; rotate them in the Redis Cloud UI if needed.
+and just writes a new agent key (and refreshes the TopBar CR URL). Old agent keys
+keep working — they're never deleted by the bootstrap; rotate them in the Redis
+Cloud UI if needed.
 
 ---
 

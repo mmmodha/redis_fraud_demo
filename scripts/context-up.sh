@@ -3,8 +3,9 @@
 #
 # Builds the one-shot bootstrap image, runs it with .env + backend/app
 # mounted so the SDK can introspect ContextModel classes and write
-# CTX_SURFACE_ID + CTX_AGENT_KEY back to the host .env. Then runs a sample
-# tool call against the live surface to confirm end-to-end wiring.
+# CTX_SURFACE_ID + CTX_AGENT_KEY + NEXT_PUBLIC_CONTEXT_RETRIEVER_URL
+# back to the host .env. Then runs a sample tool call against the live
+# surface to confirm end-to-end wiring.
 #
 # Secrets policy: this script never echoes CTX_ADMIN_KEY, CTX_AGENT_KEY,
 # REDIS_URL, or REDIS_PASSWORD. Surface and tool IDs are not secret.
@@ -46,14 +47,18 @@ docker run --rm \
   -v "${REPO_ROOT}/infra/context-retriever/bootstrap.py:/work/bootstrap.py:ro" \
   "${IMAGE_TAG}"
 
-# Re-source the .env to pick up CTX_SURFACE_ID + CTX_AGENT_KEY just written.
+# Re-source the .env to pick up values just written by bootstrap.
 set -a; . "${ENV_FILE}"; set +a
 
 if [[ -z "${CTX_AGENT_KEY:-}" || -z "${CTX_SURFACE_ID:-}" ]]; then
   echo "ERROR: bootstrap did not write CTX_SURFACE_ID / CTX_AGENT_KEY to .env" >&2
   exit 1
 fi
-
+expected_cr_url="https://app.redislabs.com/#/context-retriever/${CTX_SURFACE_ID}"
+if [[ "${NEXT_PUBLIC_CONTEXT_RETRIEVER_URL:-}" != "${expected_cr_url}" ]]; then
+  echo "WARN: NEXT_PUBLIC_CONTEXT_RETRIEVER_URL expected ${expected_cr_url}" >&2
+fi
+echo "Context Retriever TopBar URL: ${NEXT_PUBLIC_CONTEXT_RETRIEVER_URL:-"(unset)"}"
 echo
 echo "Tool catalog (ctxctl tools list --agent-key <redacted>):"
 docker run --rm -e CTX_AGENT_KEY "${IMAGE_TAG}" \
