@@ -14,6 +14,12 @@ export function TopBar() {
   const [clearState, setClearState] = useState<"idle" | "clearing" | "done">("idle");
   const { guideMode, setGuideMode } = useDemoGuide();
   const showCacheClear = process.env.NEXT_PUBLIC_DEMO_CACHE_CLEAR === "true";
+  const contextRetrieverUrl = (() => {
+    const raw = (process.env.NEXT_PUBLIC_CONTEXT_RETRIEVER_URL || "").trim();
+    // Hide empty / base-only URLs (compose may bake this when CTX_SURFACE_ID is unset).
+    if (!raw || /#\/context-retriever\/?$/.test(raw)) return null;
+    return raw;
+  })();
 
   async function onClearCache() {
     if (clearState === "clearing") return;
@@ -84,9 +90,9 @@ export function TopBar() {
           </span>
         </div>
 
-        {process.env.NEXT_PUBLIC_CONTEXT_RETRIEVER_URL && (
+        {contextRetrieverUrl && (
           <a
-            href={process.env.NEXT_PUBLIC_CONTEXT_RETRIEVER_URL}
+            href={contextRetrieverUrl}
             target="_blank"
             rel="noreferrer"
             title="Opens your Context Retriever surface in a new tab — where this demo pulls customer + transaction context"

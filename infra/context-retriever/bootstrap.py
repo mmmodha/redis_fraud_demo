@@ -135,8 +135,14 @@ async def main() -> int:
             print("ERROR: agent key value missing from API response", file=sys.stderr)
             return 3
         print("AGENT_KEY=<redacted, written to .env>")
-        _upsert_env({"CTX_SURFACE_ID": surface_id, "CTX_AGENT_KEY": agent.key})
-        print(f"wrote CTX_SURFACE_ID + CTX_AGENT_KEY -> {ENV_FILE}")
+        cr_console_url = f"https://app.redislabs.com/#/context-retriever/{surface_id}"
+        _upsert_env({
+            "CTX_SURFACE_ID": surface_id,
+            "CTX_AGENT_KEY": agent.key,
+            "NEXT_PUBLIC_CONTEXT_RETRIEVER_URL": cr_console_url,
+        })
+        print(f"wrote CTX_SURFACE_ID + CTX_AGENT_KEY + NEXT_PUBLIC_CONTEXT_RETRIEVER_URL -> {ENV_FILE}")
+        print(f"CONTEXT_RETRIEVER_URL={cr_console_url}")
 
         async with UnifiedClient() as u:
             tools = await u.list_tools(agent.key)

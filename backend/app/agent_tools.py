@@ -20,6 +20,7 @@ Retriever, an in-memory PolicyRAG) without touching the real surfaces.
 
 from __future__ import annotations
 
+import json
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -257,6 +258,7 @@ _HERO_CARD: dict[str, str] = {
     "cust_mike": "card_mike_visa",
     "cust_jane": "card_jane_visa",
     "cust_alex": "card_alex_visa",
+    "cust_sarah": "card_sarah_visa",
 }
 
 
@@ -341,13 +343,120 @@ async def _get_customer_context(backends: Backends, args: dict) -> tuple[Any, Tr
 
 
 async def _get_recent_transactions(backends: Backends, args: dict) -> tuple[Any, TraceStep]:
+    customer_id = args["customer_id"]
+    days = int(args.get("days", 30))
+    limit = int(args.get("limit", 25))
     result, step = await _ctx_call(
         backends, "get_recent_transactions", "get_recent_transactions",
-        customer_id=args["customer_id"],
-        days=int(args.get("days", 30)),
-        limit=int(args.get("limit", 25)),
+        customer_id=customer_id,
+        days=days,
+        limit=limit,
     )
+    err_text = _cr_payload_error_text(result)
+    if err_text and (
+        "No such index" in err_text
+        or "tag filter failed" in err_text
+        or ":transaction" in err_text
+    ):
+        client: redis.Redis = _need(
+            backends.redis_client, "redis_client", "get_recent_transactions",
+        )
+        start = time.perf_counter()
+        transactions, keys = _list_recent_transactions_redis(
+            client, customer_id, days=days, limit=limit,
+        )
+        latency_ms = int((time.perf_counter() - start) * 1000)
+        summary = (
+            f"{len(transactions)} transaction(s) via Redis list fallback "
+            f"(CR index missing)"
+        )
+        out = {
+            "customer_id": customer_id,
+            "days": days,
+            "transactions": transactions,
+            "count": len(transactions),
+            "source": "redis_json_fallback",
+        }
+        return out, _trace(
+            component="context_retriever",
+            tool="get_recent_transactions",
+            inp={
+                "customer_id": customer_id,
+                "days": days,
+                "limit": limit,
+                "fallback": "redis_list",
+            },
+            summary=summary,
+            data=out,
+            latency_ms=max(step.latency_ms, 0) + latency_ms,
+            keys=keys,
+        )
     return result, step
+
+
+def _list_recent_transactions_redis(
+    client: redis.Redis,
+    customer_id: str,
+    *,
+    days: int = 30,
+    limit: int = 25,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Read ``card:{id}:tx:recent`` when Context Retriever tx indexes are missing."""
+    card_id = _HERO_CARD.get(customer_id)
+    if not card_id:
+        # Fall back to a slow scan only when we cannot resolve the hero card.
+        return _scan_transactions_for_customer(client, customer_id, days=days, limit=limit)
+
+    list_key = f"card:{card_id}:tx:recent"
+    raw_items = client.lrange(list_key, 0, max(limit * 3, limit) - 1)
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    transactions: list[dict[str, Any]] = []
+    for raw in raw_items:
+        if len(transactions) >= limit:
+            break
+        try:
+            doc = json.loads(raw) if isinstance(raw, str) else raw
+        except (TypeError, ValueError, json.JSONDecodeError):
+            continue
+        if not isinstance(doc, dict):
+            continue
+        if doc.get("customer_id") and doc.get("customer_id") != customer_id:
+            continue
+        ts = str(doc.get("ts") or "")
+        if ts and ts < cutoff:
+            continue
+        transactions.append(doc)
+    return transactions, [list_key]
+
+
+def _scan_transactions_for_customer(
+    client: redis.Redis,
+    customer_id: str,
+    *,
+    days: int = 30,
+    limit: int = 25,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    transactions: list[dict[str, Any]] = []
+    keys_touched: list[str] = []
+    for key in client.scan_iter(match="tx:*", count=200):
+        if len(transactions) >= limit:
+            break
+        try:
+            raw = client.json().get(key, "$")
+        except Exception:  # noqa: BLE001
+            continue
+        if not raw:
+            continue
+        doc = raw[0] if isinstance(raw, list) else raw
+        if not isinstance(doc, dict) or doc.get("customer_id") != customer_id:
+            continue
+        ts = str(doc.get("ts") or "")
+        if ts and ts < cutoff:
+            continue
+        transactions.append(doc)
+        keys_touched.append(str(key))
+    return transactions, keys_touched
 
 
 async def _find_similar_fraud(backends: Backends, args: dict) -> tuple[Any, TraceStep]:
@@ -367,12 +476,94 @@ async def _get_merchant_reputation(backends: Backends, args: dict) -> tuple[Any,
     return result, step
 
 
+def _cr_payload_error_text(result: Any) -> Optional[str]:
+    """Return error text when a Context Retriever MCP payload marks isError."""
+    if not isinstance(result, dict):
+        return None
+    if result.get("isError") is True:
+        content = result.get("content")
+        if isinstance(content, list) and content:
+            first = content[0]
+            if isinstance(first, dict) and isinstance(first.get("text"), str):
+                return first["text"]
+        return str(result)
+    content = result.get("content")
+    if isinstance(content, list):
+        for item in content:
+            if not isinstance(item, dict):
+                continue
+            text = item.get("text")
+            if item.get("isError") is True and isinstance(text, str):
+                return text
+            if isinstance(text, str) and (
+                "No such index" in text or "tag filter failed" in text
+            ):
+                return text
+    return None
+
+
+def _list_devices_for_customer_redis(
+    client: redis.Redis, customer_id: str, limit: int = 25,
+) -> tuple[list[dict[str, Any]], list[str]]:
+    """Scan ``device:*`` JSON docs when Context Retriever indexes are missing."""
+    devices: list[dict[str, Any]] = []
+    keys_touched: list[str] = []
+    for key in client.scan_iter(match="device:*", count=100):
+        if len(devices) >= limit:
+            break
+        try:
+            raw = client.json().get(key, "$")
+        except Exception:  # noqa: BLE001
+            continue
+        if not raw:
+            continue
+        doc = raw[0] if isinstance(raw, list) else raw
+        if not isinstance(doc, dict):
+            continue
+        if doc.get("customer_id") != customer_id:
+            continue
+        devices.append(doc)
+        keys_touched.append(str(key))
+    return devices, keys_touched
+
+
 async def _get_devices_for_customer(backends: Backends, args: dict) -> tuple[Any, TraceStep]:
+    customer_id = args["customer_id"]
+    limit = int(args.get("limit", 25))
     result, step = await _ctx_call(
         backends, "get_devices_for_customer", "devices_seen_for_customer",
-        customer_id=args["customer_id"],
-        limit=int(args.get("limit", 25)),
+        customer_id=customer_id,
+        limit=limit,
     )
+    err_text = _cr_payload_error_text(result)
+    if err_text and (
+        "No such index" in err_text
+        or "tag filter failed" in err_text
+        or ":device" in err_text
+    ):
+        client: redis.Redis = _need(backends.redis_client, "redis_client", "get_devices_for_customer")
+        start = time.perf_counter()
+        devices, keys = _list_devices_for_customer_redis(client, customer_id, limit)
+        latency_ms = int((time.perf_counter() - start) * 1000)
+        summary = (
+            f"{len(devices)} device(s) via Redis JSON fallback "
+            f"(CR index missing)"
+        )
+        out = {
+            "customer_id": customer_id,
+            "devices": devices,
+            "count": len(devices),
+            "source": "redis_json_fallback",
+        }
+        return out, _trace(
+            component="context_retriever",
+            tool="get_devices_for_customer",
+            inp={"customer_id": customer_id, "limit": limit, "fallback": "redis_json"},
+            summary=summary,
+            data=out,
+            latency_ms=max(step.latency_ms, 0) + latency_ms,
+            keys=keys,
+        )
     return result, step
 
 

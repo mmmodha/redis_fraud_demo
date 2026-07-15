@@ -47,6 +47,57 @@ async def test_get_devices_for_customer_delegates_to_context_retriever(backends)
     assert ("filter_device_by_customer_id", {"value": "cust_alex", "limit": 25}) in fake_calls
 
 
+async def test_get_devices_fallback_when_cr_index_missing(client, backends):
+    """When CR returns No such index for device, fall back to Redis JSON."""
+    client.json().set(
+        "device:dev_alex_macbook",
+        "$",
+        {
+            "device_id": "dev_alex_macbook",
+            "customer_id": "cust_alex",
+            "os": "macOS",
+            "country": "US",
+        },
+    )
+
+    class BrokenCR(FakeContextRetriever):
+        async def _call(self, tool: str, args: dict):
+            self.calls.append((tool, dict(args)))
+            err = {
+                "content": [{
+                    "type": "text",
+                    "text": (
+                        "Error executing tool: tag filter failed: "
+                        "No such index idx:demo:device"
+                    ),
+                    "isError": True,
+                }],
+                "isError": True,
+            }
+            from app.context_retriever import TraceRecord
+            trace = TraceRecord(
+                tool=tool, input=dict(args),
+                output_summary="No such index", latency_ms=2,
+            )
+            return err, trace
+
+        async def devices_seen_for_customer(self, customer_id, limit=25):
+            return await self._call(
+                "filter_device_by_customer_id",
+                {"value": customer_id, "limit": limit},
+            )
+
+    backends.ctx = BrokenCR()
+    out, step = await call_tool(
+        "get_devices_for_customer", {"customer_id": "cust_alex"}, backends=backends,
+    )
+    assert out["count"] == 1
+    assert out["devices"][0]["device_id"] == "dev_alex_macbook"
+    assert out["source"] == "redis_json_fallback"
+    assert "fallback" in step.output_summary.lower() or "Redis JSON" in step.output_summary
+    assert "device:dev_alex_macbook" in step.redis_keys_touched
+
+
 # ---------- get_disputes --------------------------------------------------
 
 def _seed_disputes(client: fakeredis.FakeRedis) -> None:
